@@ -26,8 +26,8 @@
             border-radius: 20px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
             width: 100%;
-            max-width: 800px;
-            height: 600px;
+            max-width: 900px;
+            height: 650px;
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -48,6 +48,37 @@
         .header p {
             font-size: 14px;
             opacity: 0.9;
+        }
+
+        .mode-selector {
+            display: flex;
+            padding: 15px 20px;
+            background: #f9f9f9;
+            gap: 10px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .mode-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+        }
+
+        .mode-btn:hover:not(.active) {
+            border-color: #667eea;
+            transform: translateY(-2px);
         }
 
         .chat-area {
@@ -89,6 +120,16 @@
             color: #333;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             white-space: pre-wrap;
+        }
+
+        .message.bot .sql-info {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            font-size: 12px;
+            font-family: monospace;
+            color: #555;
         }
 
         .message.bot .sources {
@@ -171,7 +212,7 @@
             cursor: pointer;
             color: #667eea;
             text-decoration: underline;
-            margin: 0 10px;
+            margin: 0 8px;
         }
 
         .example-questions span:hover {
@@ -182,24 +223,25 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🤖 세일즈 RAG 챗봇</h1>
-            <p>세일즈 데이터 분석에 대해 질문해주세요</p>
+            <h1>🤖 세일즈 AI 챗봇</h1>
+            <p>문서 질의응답 & 데이터 조회</p>
         </div>
 
-        <div class="example-questions">
-            예시:
-            <span onclick="askQuestion('2024년 매출 계산 방법은?')">매출 계산 방법</span>
-            <span onclick="askQuestion('이탈 고객은 어떻게 정의하나요?')">이탈 고객 정의</span>
-            <span onclick="askQuestion('마진율은 무엇인가요?')">마진율 설명</span>
+        <div class="mode-selector">
+            <button class="mode-btn active" id="ragMode" onclick="switchMode('rag')">
+                📚 RAG 모드 (문서 질의응답)
+            </button>
+            <button class="mode-btn" id="sqlMode" onclick="switchMode('sql')">
+                🔍 SQL 모드 (데이터 조회)
+            </button>
+        </div>
+
+        <div class="example-questions" id="exampleQuestions">
+            <!-- 동적으로 업데이트됨 -->
         </div>
 
         <div class="chat-area" id="chatArea">
-            <div class="message bot">
-                <div class="message-bubble">
-                    안녕하세요! 세일즈 데이터 분석 전문 챗봇입니다. 📊<br><br>
-                    비즈니스 규칙, 데이터 정의, 지표 계산 방법 등에 대해 질문해주세요.
-                </div>
-            </div>
+            <!-- 메시지가 여기에 추가됨 -->
         </div>
 
         <div class="input-area">
@@ -217,11 +259,50 @@
     </div>
 
     <script>
+        let currentMode = 'rag';
         const chatArea = document.getElementById('chatArea');
         const questionInput = document.getElementById('questionInput');
         const sendButton = document.getElementById('sendButton');
+        const exampleQuestions = document.getElementById('exampleQuestions');
 
-        function addMessage(text, isUser, sources = null) {
+        const examples = {
+            rag: [
+                '매출 계산 방법은?',
+                '이탈 고객은 어떻게 정의하나요?',
+                '마진율이란 무엇인가요?'
+            ],
+            sql: [
+                '2024년 전체 매출은?',
+                '2024년 세명아크릴 매출 알려줘',
+                '상위 10개 거래처는?'
+            ]
+        };
+
+        function switchMode(mode) {
+            currentMode = mode;
+            document.getElementById('ragMode').classList.toggle('active', mode === 'rag');
+            document.getElementById('sqlMode').classList.toggle('active', mode === 'sql');
+            updateExamples();
+            addWelcomeMessage();
+        }
+
+        function updateExamples() {
+            const exs = examples[currentMode];
+            exampleQuestions.innerHTML = '예시: ' + exs.map(q =>
+                `<span onclick="askQuestion('${q}')">${q}</span>`
+            ).join('');
+        }
+
+        function addWelcomeMessage() {
+            chatArea.innerHTML = '';
+            const welcomeMsg = currentMode === 'rag'
+                ? '📚 RAG 모드입니다.\n비즈니스 규칙, 데이터 정의, 지표 계산 방법 등에 대해 질문해주세요.'
+                : '🔍 SQL 모드입니다.\n실제 매출 데이터를 조회할 수 있습니다. 연도, 거래처, 담당자 등으로 질문해보세요.';
+
+            addMessage(welcomeMsg, false);
+        }
+
+        function addMessage(text, isUser, meta = null) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
 
@@ -231,13 +312,21 @@
 
             messageDiv.appendChild(bubbleDiv);
 
-            if (sources && sources.length > 0) {
-                const sourcesDiv = document.createElement('div');
-                sourcesDiv.className = 'sources';
-                sourcesDiv.textContent = '📚 출처: ' + sources.map(s =>
-                    `${s.doc_id} (${(s.similarity * 100).toFixed(1)}%)`
-                ).join(', ');
-                messageDiv.appendChild(sourcesDiv);
+            if (meta) {
+                if (meta.sql) {
+                    const sqlDiv = document.createElement('div');
+                    sqlDiv.className = 'sql-info';
+                    sqlDiv.textContent = '💻 SQL: ' + meta.sql;
+                    messageDiv.appendChild(sqlDiv);
+                }
+                if (meta.sources && meta.sources.length > 0) {
+                    const sourcesDiv = document.createElement('div');
+                    sourcesDiv.className = 'sources';
+                    sourcesDiv.textContent = '📚 출처: ' + meta.sources.map(s =>
+                        `${s.doc_id} (${(s.similarity * 100).toFixed(1)}%)`
+                    ).join(', ');
+                    messageDiv.appendChild(sourcesDiv);
+                }
             }
 
             chatArea.appendChild(messageDiv);
@@ -271,16 +360,16 @@
             const question = questionInput.value.trim();
             if (!question) return;
 
-            // 사용자 메시지 추가
             addMessage(question, true);
             questionInput.value = '';
 
-            // 로딩 표시
             addLoadingMessage();
             sendButton.disabled = true;
 
             try {
-                const response = await fetch('/api/query', {
+                const endpoint = currentMode === 'rag' ? '/api/query' : '/api/query-sql';
+
+                const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -293,9 +382,13 @@
                 removeLoadingMessage();
 
                 if (data.success) {
-                    addMessage(data.answer, false, data.sources);
+                    const meta = currentMode === 'rag'
+                        ? { sources: data.sources }
+                        : { sql: data.sql };
+
+                    addMessage(data.answer, false, meta);
                 } else {
-                    addMessage('❌ 오류: ' + (data.error || '알 수 없는 오류가 발생했습니다.'), false);
+                    addMessage('❌ 오류: ' + (data.error || '알 수 없는 오류'), false);
                 }
             } catch (error) {
                 removeLoadingMessage();
@@ -311,13 +404,9 @@
             questionInput.focus();
         }
 
-        // 엔터키로 전송
-        questionInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendQuestion(e);
-            }
-        });
+        // 초기화
+        updateExamples();
+        addWelcomeMessage();
     </script>
 </body>
 </html>
