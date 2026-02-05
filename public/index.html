@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>세일즈 RAG 챗봇</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 800px;
+            height: 600px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .chat-area {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f7f7f7;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            text-align: right;
+        }
+
+        .message-bubble {
+            display: inline-block;
+            padding: 12px 18px;
+            border-radius: 18px;
+            max-width: 70%;
+            word-wrap: break-word;
+        }
+
+        .message.user .message-bubble {
+            background: #667eea;
+            color: white;
+        }
+
+        .message.bot .message-bubble {
+            background: white;
+            color: #333;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            white-space: pre-wrap;
+        }
+
+        .message.bot .sources {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .input-area {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .input-form {
+            display: flex;
+            gap: 10px;
+        }
+
+        #questionInput {
+            flex: 1;
+            padding: 12px 18px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        #questionInput:focus {
+            border-color: #667eea;
+        }
+
+        #sendButton {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        #sendButton:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        #sendButton:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .example-questions {
+            padding: 10px 20px;
+            background: #f0f0f0;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
+
+        .example-questions span {
+            cursor: pointer;
+            color: #667eea;
+            text-decoration: underline;
+            margin: 0 10px;
+        }
+
+        .example-questions span:hover {
+            color: #764ba2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 세일즈 RAG 챗봇</h1>
+            <p>세일즈 데이터 분석에 대해 질문해주세요</p>
+        </div>
+
+        <div class="example-questions">
+            예시:
+            <span onclick="askQuestion('2024년 매출 계산 방법은?')">매출 계산 방법</span>
+            <span onclick="askQuestion('이탈 고객은 어떻게 정의하나요?')">이탈 고객 정의</span>
+            <span onclick="askQuestion('마진율은 무엇인가요?')">마진율 설명</span>
+        </div>
+
+        <div class="chat-area" id="chatArea">
+            <div class="message bot">
+                <div class="message-bubble">
+                    안녕하세요! 세일즈 데이터 분석 전문 챗봇입니다. 📊<br><br>
+                    비즈니스 규칙, 데이터 정의, 지표 계산 방법 등에 대해 질문해주세요.
+                </div>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <form class="input-form" onsubmit="sendQuestion(event)">
+                <input
+                    type="text"
+                    id="questionInput"
+                    placeholder="질문을 입력하세요..."
+                    autocomplete="off"
+                    required
+                >
+                <button type="submit" id="sendButton">전송</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const chatArea = document.getElementById('chatArea');
+        const questionInput = document.getElementById('questionInput');
+        const sendButton = document.getElementById('sendButton');
+
+        function addMessage(text, isUser, sources = null) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.className = 'message-bubble';
+            bubbleDiv.textContent = text;
+
+            messageDiv.appendChild(bubbleDiv);
+
+            if (sources && sources.length > 0) {
+                const sourcesDiv = document.createElement('div');
+                sourcesDiv.className = 'sources';
+                sourcesDiv.textContent = '📚 출처: ' + sources.map(s =>
+                    `${s.doc_id} (${(s.similarity * 100).toFixed(1)}%)`
+                ).join(', ');
+                messageDiv.appendChild(sourcesDiv);
+            }
+
+            chatArea.appendChild(messageDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        function addLoadingMessage() {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message bot';
+            messageDiv.id = 'loadingMessage';
+
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.className = 'message-bubble';
+            bubbleDiv.innerHTML = '<div class="loading"></div>';
+
+            messageDiv.appendChild(bubbleDiv);
+            chatArea.appendChild(messageDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        function removeLoadingMessage() {
+            const loadingMsg = document.getElementById('loadingMessage');
+            if (loadingMsg) {
+                loadingMsg.remove();
+            }
+        }
+
+        async function sendQuestion(event) {
+            event.preventDefault();
+
+            const question = questionInput.value.trim();
+            if (!question) return;
+
+            // 사용자 메시지 추가
+            addMessage(question, true);
+            questionInput.value = '';
+
+            // 로딩 표시
+            addLoadingMessage();
+            sendButton.disabled = true;
+
+            try {
+                const response = await fetch('/api/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ question }),
+                });
+
+                const data = await response.json();
+
+                removeLoadingMessage();
+
+                if (data.success) {
+                    addMessage(data.answer, false, data.sources);
+                } else {
+                    addMessage('❌ 오류: ' + (data.error || '알 수 없는 오류가 발생했습니다.'), false);
+                }
+            } catch (error) {
+                removeLoadingMessage();
+                addMessage('❌ 서버 연결 오류: ' + error.message, false);
+            } finally {
+                sendButton.disabled = false;
+                questionInput.focus();
+            }
+        }
+
+        function askQuestion(question) {
+            questionInput.value = question;
+            questionInput.focus();
+        }
+
+        // 엔터키로 전송
+        questionInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendQuestion(e);
+            }
+        });
+    </script>
+</body>
+</html>
