@@ -1,0 +1,23 @@
+{
+  "name": "rag-sales",
+  "version": "1.0.0",
+  "description": "RAG-based Sales Data Analysis API",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "ingest": "node scripts/ingest_rag_gemini.mjs",
+    "query": "node scripts/query_rag.mjs",
+    "chat": "node scripts/chat.mjs",
+    "query-sql": "node scripts/query_sql.mjs",
+    "chat-sql": "node scripts/chat_sql.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google/genai": "^1.39.0",
+    "@supabase/supabase-js": "^2.94.0",
+    "dotenv": "^17.2.3"
+  }
+}
