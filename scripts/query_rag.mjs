@@ -48,10 +48,6 @@ async function searchSimilarChunks(embedding, topK = 5) {
  * RAG: 검색된 컨텍스트로 답변 생성
  */
 async function generateAnswer(question, context) {
-  const model = ai.models.generate({
-    model: process.env.GEN_MODEL || "gemini-2.5-flash",
-  });
-
   const prompt = `당신은 세일즈 데이터 분석 전문가입니다. 아래 문서 내용을 바탕으로 질문에 답변해주세요.
 
 # 참고 문서
@@ -68,8 +64,12 @@ ${question}
 
 답변:`;
 
-  const result = await model.generateContent({ contents: prompt });
-  return result.response.text();
+  const result = await ai.models.generateContent({
+    model: process.env.GEN_MODEL || "gemini-2.5-flash",
+    contents: prompt,
+  });
+
+  return result.text;
 }
 
 /**
