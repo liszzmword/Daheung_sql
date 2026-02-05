@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>세일즈 RAG 챗봇</title>
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
     <style>
         * {
             margin: 0;
@@ -12,7 +13,7 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             height: 100vh;
             display: flex;
@@ -42,11 +43,13 @@
 
         .header h1 {
             font-size: 24px;
+            font-weight: 700;
             margin-bottom: 5px;
         }
 
         .header p {
             font-size: 14px;
+            font-weight: 400;
             opacity: 0.9;
         }
 
@@ -91,6 +94,7 @@
         .message {
             margin-bottom: 15px;
             animation: fadeIn 0.3s ease-in;
+            position: relative;
         }
 
         @keyframes fadeIn {
@@ -108,6 +112,7 @@
             border-radius: 18px;
             max-width: 70%;
             word-wrap: break-word;
+            position: relative;
         }
 
         .message.user .message-bubble {
@@ -122,13 +127,78 @@
             white-space: pre-wrap;
         }
 
+        .message.bot .message-bubble strong {
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .message.bot .data-table {
+            margin-top: 10px;
+            overflow-x: auto;
+        }
+
+        .message.bot table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+
+        .message.bot table th,
+        .message.bot table td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        .message.bot table th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+
+        .message.bot table tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        .message.bot table tr:hover {
+            background: #f0f0f0;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            padding: 4px 8px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .message.bot:hover .copy-btn {
+            opacity: 1;
+        }
+
+        .copy-btn:hover {
+            background: #5568d3;
+        }
+
+        .copy-btn.copied {
+            background: #10b981;
+        }
+
         .message.bot .sql-info {
             margin-top: 10px;
             padding: 10px;
             background: #f0f0f0;
             border-radius: 8px;
             font-size: 12px;
-            font-family: monospace;
+            font-family: 'Consolas', 'Monaco', monospace;
             color: #555;
         }
 
@@ -236,13 +306,9 @@
             </button>
         </div>
 
-        <div class="example-questions" id="exampleQuestions">
-            <!-- 동적으로 업데이트됨 -->
-        </div>
+        <div class="example-questions" id="exampleQuestions"></div>
 
-        <div class="chat-area" id="chatArea">
-            <!-- 메시지가 여기에 추가됨 -->
-        </div>
+        <div class="chat-area" id="chatArea"></div>
 
         <div class="input-area">
             <form class="input-form" onsubmit="sendQuestion(event)">
@@ -273,8 +339,8 @@
             ],
             sql: [
                 '2024년 전체 매출은?',
-                '2024년 세명아크릴 매출 알려줘',
-                '상위 10개 거래처는?'
+                '2024년 상위 10개 거래처 알려줘',
+                '김도순 담당 2024년 매출은?'
             ]
         };
 
@@ -302,17 +368,95 @@
             addMessage(welcomeMsg, false);
         }
 
+        function formatMarkdown(text) {
+            // **bold** -> <strong>bold</strong>
+            text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+            // *italic* -> <em>italic</em>
+            text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+            return text;
+        }
+
+        function parseTable(data) {
+            // JSON 배열을 HTML 테이블로 변환
+            if (!Array.isArray(data) || data.length === 0) return null;
+
+            const keys = Object.keys(data[0]);
+            let html = '<table><thead><tr>';
+
+            keys.forEach(key => {
+                html += `<th>${key}</th>`;
+            });
+
+            html += '</tr></thead><tbody>';
+
+            data.forEach(row => {
+                html += '<tr>';
+                keys.forEach(key => {
+                    let value = row[key];
+                    // 숫자 포맷팅
+                    if (typeof value === 'number' && value > 1000) {
+                        value = value.toLocaleString('ko-KR');
+                    }
+                    html += `<td>${value}</td>`;
+                });
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            return html;
+        }
+
+        function copyToClipboard(text, button) {
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = button.textContent;
+                button.textContent = '✓ 복사됨';
+                button.classList.add('copied');
+
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.classList.remove('copied');
+                }, 2000);
+            });
+        }
+
         function addMessage(text, isUser, meta = null) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
 
             const bubbleDiv = document.createElement('div');
             bubbleDiv.className = 'message-bubble';
-            bubbleDiv.textContent = text;
+
+            if (!isUser) {
+                // 복사 버튼 추가
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-btn';
+                copyBtn.textContent = '📋 복사';
+                copyBtn.onclick = () => copyToClipboard(text, copyBtn);
+                bubbleDiv.appendChild(copyBtn);
+
+                // 마크다운 포맷팅
+                const formattedText = formatMarkdown(text);
+                bubbleDiv.innerHTML += formattedText;
+
+                // 테이블 데이터 처리
+                if (meta && meta.data && Array.isArray(meta.data) && meta.data.length > 0) {
+                    const tableHtml = parseTable(meta.data);
+                    if (tableHtml) {
+                        const tableDiv = document.createElement('div');
+                        tableDiv.className = 'data-table';
+                        tableDiv.innerHTML = tableHtml;
+                        bubbleDiv.appendChild(tableDiv);
+                    }
+                }
+            } else {
+                bubbleDiv.textContent = text;
+            }
 
             messageDiv.appendChild(bubbleDiv);
 
-            if (meta) {
+            if (meta && !isUser) {
                 if (meta.sql) {
                     const sqlDiv = document.createElement('div');
                     sqlDiv.className = 'sql-info';
@@ -384,7 +528,7 @@
                 if (data.success) {
                     const meta = currentMode === 'rag'
                         ? { sources: data.sources }
-                        : { sql: data.sql };
+                        : { sql: data.sql, data: data.data };
 
                     addMessage(data.answer, false, meta);
                 } else {
@@ -404,7 +548,6 @@
             questionInput.focus();
         }
 
-        // 초기화
         updateExamples();
         addWelcomeMessage();
     </script>
