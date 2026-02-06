@@ -2,6 +2,7 @@ import { validateEnv } from "../lib/clients.mjs";
 import { embedQuery } from "../lib/embedding.mjs";
 import { searchRelevantDocs, buildContext } from "../lib/rag.mjs";
 import { generateAndExecuteSQL, generateSQLAnswer } from "../lib/sql.mjs";
+import { logQuery } from "../lib/logger.mjs";
 
 /** Text-to-SQL 데이터 조회 API */
 export default async function handler(req, res) {
@@ -35,6 +36,7 @@ export default async function handler(req, res) {
     const { sql, result } = await generateAndExecuteSQL(q, ragContext);
 
     if (!result.success) {
+      logQuery({ mode: "sql", question: q, sql_generated: sql, success: false, error_message: result.error });
       return res.status(200).json({
         success: false,
         question: q,
@@ -46,6 +48,8 @@ export default async function handler(req, res) {
     // 3. 자연어 답변 생성
     const answer = await generateSQLAnswer(q, sql, result);
 
+    logQuery({ mode: "sql", question: q, answer, sql_generated: sql, data: result.data, success: true });
+
     return res.status(200).json({
       success: true,
       question: q,
@@ -55,6 +59,7 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error("API 오류:", error);
+    logQuery({ mode: "sql", question: req.body?.question, success: false, error_message: error.message });
     return res.status(500).json({ success: false, error: "서버 오류가 발생했습니다.", message: error.message });
   }
 }

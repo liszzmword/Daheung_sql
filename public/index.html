@@ -300,6 +300,190 @@
             40% { opacity: 1; transform: scale(1); }
         }
 
+        /* 히스토리 버튼 */
+        .history-btn {
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            font-family: inherit;
+            color: var(--text-sub);
+            transition: all 0.15s;
+        }
+
+        .history-btn:hover {
+            background: var(--accent-light);
+            color: var(--text);
+        }
+
+        .history-btn.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+
+        /* 히스토리 패널 */
+        .history-panel {
+            display: none;
+            flex: 1;
+            overflow-y: auto;
+            background: var(--bg);
+        }
+
+        .history-panel.show {
+            display: block;
+        }
+
+        .history-header {
+            padding: 12px 24px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .history-filter {
+            display: flex;
+            gap: 4px;
+            background: var(--accent-light);
+            border-radius: 6px;
+            padding: 2px;
+        }
+
+        .history-filter button {
+            padding: 4px 10px;
+            border: none;
+            background: transparent;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-sub);
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+
+        .history-filter button.active {
+            background: var(--surface);
+            color: var(--text);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+        }
+
+        .history-count {
+            margin-left: auto;
+            font-size: 12px;
+            color: var(--text-sub);
+        }
+
+        .history-list {
+            padding: 8px;
+        }
+
+        .history-item {
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--surface);
+            margin-bottom: 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .history-item:hover {
+            border-color: var(--accent);
+        }
+
+        .history-item-top {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .history-mode {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .history-mode.rag {
+            background: #ede9fe;
+            color: #6d28d9;
+        }
+
+        .history-mode.sql {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .history-time {
+            font-size: 11px;
+            color: var(--text-sub);
+            margin-left: auto;
+        }
+
+        .history-status {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .history-status.ok { background: #22c55e; }
+        .history-status.fail { background: #ef4444; }
+
+        .history-question {
+            font-size: 13px;
+            font-weight: 500;
+            line-height: 1.4;
+            margin-bottom: 4px;
+        }
+
+        .history-answer {
+            font-size: 12px;
+            color: var(--text-sub);
+            line-height: 1.4;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+
+        .history-empty {
+            padding: 40px 24px;
+            text-align: center;
+            color: var(--text-sub);
+            font-size: 13px;
+        }
+
+        .history-more {
+            padding: 12px;
+            text-align: center;
+        }
+
+        .history-more button {
+            padding: 8px 20px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            font-family: inherit;
+            color: var(--text-sub);
+            transition: all 0.15s;
+        }
+
+        .history-more button:hover {
+            background: var(--accent-light);
+        }
+
         /* 모바일 */
         @media (max-width: 640px) {
             .header { padding: 12px 16px; }
@@ -308,20 +492,38 @@
             .input-area { padding: 12px 16px; }
             .bubble { max-width: 88%; }
             .meta { max-width: 88%; }
+            .history-header { padding: 12px 16px; }
+            .history-list { padding: 8px; }
         }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>대흥 세일즈</h1>
-        <div class="mode-toggle">
-            <button id="ragMode" class="active" onclick="switchMode('rag')">문서</button>
-            <button id="sqlMode" onclick="switchMode('sql')">데이터</button>
+        <div style="display:flex; align-items:center; gap:8px;">
+            <div class="mode-toggle">
+                <button id="ragMode" class="active" onclick="switchMode('rag')">문서</button>
+                <button id="sqlMode" onclick="switchMode('sql')">데이터</button>
+            </div>
+            <button class="history-btn" id="historyBtn" onclick="toggleHistory()">기록</button>
         </div>
     </div>
 
     <div class="examples" id="exampleQuestions"></div>
     <div class="chat-area" id="chatArea"></div>
+
+    <!-- 히스토리 패널 -->
+    <div class="history-panel" id="historyPanel">
+        <div class="history-header">
+            <div class="history-filter">
+                <button class="active" onclick="filterHistory('all', this)">전체</button>
+                <button onclick="filterHistory('sql', this)">데이터</button>
+                <button onclick="filterHistory('rag', this)">문서</button>
+            </div>
+            <span class="history-count" id="historyCount"></span>
+        </div>
+        <div class="history-list" id="historyList"></div>
+    </div>
 
     <div class="input-area">
         <form class="input-form" onsubmit="sendQuestion(event)">
@@ -500,6 +702,145 @@
             } finally {
                 sendButton.disabled = false;
                 questionInput.focus();
+            }
+        }
+
+        // ===== 히스토리 기능 =====
+        let historyVisible = false;
+        let historyFilter = 'all';
+        let historyOffset = 0;
+        const HISTORY_LIMIT = 30;
+
+        function toggleHistory() {
+            historyVisible = !historyVisible;
+            const panel = document.getElementById('historyPanel');
+            const btn = document.getElementById('historyBtn');
+            const chatArea = document.getElementById('chatArea');
+            const examples = document.getElementById('exampleQuestions');
+            const inputArea = document.querySelector('.input-area');
+
+            if (historyVisible) {
+                panel.classList.add('show');
+                btn.classList.add('active');
+                chatArea.style.display = 'none';
+                examples.style.display = 'none';
+                inputArea.style.display = 'none';
+                historyOffset = 0;
+                loadHistory();
+            } else {
+                panel.classList.remove('show');
+                btn.classList.remove('active');
+                chatArea.style.display = '';
+                examples.style.display = '';
+                inputArea.style.display = '';
+            }
+        }
+
+        function filterHistory(mode, btnEl) {
+            historyFilter = mode;
+            historyOffset = 0;
+            document.querySelectorAll('.history-filter button').forEach(b => b.classList.remove('active'));
+            btnEl.classList.add('active');
+            loadHistory();
+        }
+
+        function formatTime(dateStr) {
+            const d = new Date(dateStr);
+            const now = new Date();
+            const diff = now - d;
+            const mins = Math.floor(diff / 60000);
+            const hours = Math.floor(diff / 3600000);
+            const days = Math.floor(diff / 86400000);
+
+            if (mins < 1) return '방금';
+            if (mins < 60) return `${mins}분 전`;
+            if (hours < 24) return `${hours}시간 전`;
+            if (days < 7) return `${days}일 전`;
+            return `${d.getMonth() + 1}/${d.getDate()}`;
+        }
+
+        async function loadHistory(append = false) {
+            const list = document.getElementById('historyList');
+            const countEl = document.getElementById('historyCount');
+
+            if (!append) list.innerHTML = '';
+
+            try {
+                let url = `/api/query-logs?limit=${HISTORY_LIMIT}&offset=${historyOffset}`;
+                if (historyFilter !== 'all') url += `&mode=${historyFilter}`;
+
+                const res = await fetch(url);
+                const json = await res.json();
+
+                if (!json.success || !json.data) {
+                    list.innerHTML = '<div class="history-empty">기록을 불러올 수 없습니다.</div>';
+                    return;
+                }
+
+                countEl.textContent = `${json.total}건`;
+
+                if (json.data.length === 0 && !append) {
+                    list.innerHTML = '<div class="history-empty">아직 기록이 없습니다.</div>';
+                    return;
+                }
+
+                json.data.forEach(item => {
+                    const el = document.createElement('div');
+                    el.className = 'history-item';
+                    el.onclick = () => useHistoryItem(item);
+
+                    el.innerHTML = `
+                        <div class="history-item-top">
+                            <span class="history-mode ${item.mode}">${item.mode === 'sql' ? '데이터' : '문서'}</span>
+                            <span class="history-status ${item.success ? 'ok' : 'fail'}"></span>
+                            <span class="history-time">${formatTime(item.created_at)}</span>
+                        </div>
+                        <div class="history-question">${escapeHtml(item.question || '')}</div>
+                        <div class="history-answer">${escapeHtml(item.answer || item.error_message || '')}</div>
+                    `;
+                    list.appendChild(el);
+                });
+
+                // 더보기 버튼
+                const existingMore = list.querySelector('.history-more');
+                if (existingMore) existingMore.remove();
+
+                if (historyOffset + HISTORY_LIMIT < json.total) {
+                    const moreDiv = document.createElement('div');
+                    moreDiv.className = 'history-more';
+                    moreDiv.innerHTML = '<button onclick="loadMoreHistory()">더 보기</button>';
+                    list.appendChild(moreDiv);
+                }
+            } catch (err) {
+                list.innerHTML = '<div class="history-empty">기록을 불러올 수 없습니다.</div>';
+            }
+        }
+
+        function loadMoreHistory() {
+            historyOffset += HISTORY_LIMIT;
+            loadHistory(true);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function useHistoryItem(item) {
+            // 히스토리 닫고 해당 질문을 채팅에 표시
+            toggleHistory();
+            const mode = item.mode;
+            if (mode !== currentMode) switchMode(mode);
+
+            addMessage(item.question, true);
+            if (item.success && item.answer) {
+                const meta = mode === 'sql'
+                    ? { sql: item.sql_generated }
+                    : {};
+                addMessage(item.answer, false, meta);
+            } else {
+                addMessage('오류: ' + (item.error_message || '알 수 없는 오류'), false);
             }
         }
 

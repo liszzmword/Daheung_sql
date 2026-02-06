@@ -1,6 +1,7 @@
 import { validateEnv } from "../lib/clients.mjs";
 import { embedQuery } from "../lib/embedding.mjs";
 import { searchRelevantDocs, buildContext, generateRAGAnswer } from "../lib/rag.mjs";
+import { logQuery } from "../lib/logger.mjs";
 
 /** RAG 문서 질의응답 API */
 export default async function handler(req, res) {
@@ -28,25 +29,31 @@ export default async function handler(req, res) {
     const docs = await searchRelevantDocs(embedding, { count: 5 });
 
     if (!docs || docs.length === 0) {
+      const noDocAnswer = "관련 문서를 찾을 수 없습니다.";
+      logQuery({ mode: "rag", question: q, answer: noDocAnswer, success: true });
       return res.status(200).json({
         success: true,
         question: q,
-        answer: "관련 문서를 찾을 수 없습니다.",
+        answer: noDocAnswer,
         sources: [],
       });
     }
 
     const context = buildContext(docs);
     const answer = await generateRAGAnswer(q, context);
+    const sources = docs.map((d) => ({ doc_id: d.doc_id, similarity: d.similarity }));
+
+    logQuery({ mode: "rag", question: q, answer, sources, success: true });
 
     return res.status(200).json({
       success: true,
       question: q,
       answer,
-      sources: docs.map((d) => ({ doc_id: d.doc_id, similarity: d.similarity })),
+      sources,
     });
   } catch (error) {
     console.error("API 오류:", error);
+    logQuery({ mode: "rag", question: req.body?.question, success: false, error_message: error.message });
     return res.status(500).json({ success: false, error: "서버 오류가 발생했습니다.", message: error.message });
   }
 }
