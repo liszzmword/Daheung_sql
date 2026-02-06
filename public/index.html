@@ -111,14 +111,10 @@
         }
 
         .message.bot .bubble {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            white-space: pre-wrap;
-            position: relative;
-        }
-
-        .message.bot .bubble strong {
-            font-weight: 600;
+            max-width: none;
+            padding: 0;
+            background: transparent;
+            border: none;
         }
 
         /* 메타 정보 (SQL, 출처) */
@@ -184,25 +180,53 @@
             background: var(--accent-light);
         }
 
-        /* 복사 버튼 */
+        /* 답변 섹션 (글 / 표 분리) */
+        .answer-section {
+            position: relative;
+        }
+
+        .answer-text {
+            padding: 10px 14px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: keep-all;
+            overflow-wrap: break-word;
+            max-width: 75%;
+        }
+
+        .answer-text strong { font-weight: 600; }
+
+        .answer-table-wrap {
+            margin-top: 8px;
+            max-width: 75%;
+            position: relative;
+        }
+
+        /* 복사 버튼 바 */
+        .copy-bar {
+            display: flex;
+            gap: 4px;
+            margin-top: 4px;
+            max-width: 75%;
+        }
+
         .copy-btn {
-            position: absolute;
-            top: 6px;
-            right: 6px;
-            padding: 3px 8px;
+            padding: 4px 10px;
             background: var(--accent-light);
             border: 1px solid var(--border);
             border-radius: 4px;
             font-size: 11px;
             cursor: pointer;
-            opacity: 0;
-            transition: opacity 0.15s;
             font-family: inherit;
             color: var(--text-sub);
+            transition: all 0.15s;
         }
 
-        .message.bot:hover .copy-btn { opacity: 1; }
-        .copy-btn:hover { background: var(--border); }
+        .copy-btn:hover { background: var(--border); color: var(--text); }
         .copy-btn.copied { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
 
         /* 예시 질문 */
@@ -573,7 +597,7 @@
             return text;
         }
 
-        function buildTable(data) {
+        function buildTableHTML(data) {
             if (!Array.isArray(data) || data.length === 0) return '';
             const keys = Object.keys(data[0]);
             let html = '<div class="data-table"><table><thead><tr>';
@@ -592,11 +616,38 @@
             return html;
         }
 
-        function copyText(text, btn) {
+        /** 테이블 데이터를 탭 구분 텍스트로 변환 (엑셀 붙여넣기 가능) */
+        function tableDataToTSV(data) {
+            if (!Array.isArray(data) || data.length === 0) return '';
+            const keys = Object.keys(data[0]);
+            const header = keys.join('\t');
+            const rows = data.map(row => keys.map(k => {
+                let v = row[k];
+                if (typeof v === 'number' && v > 1000) v = v.toLocaleString('ko-KR');
+                return v ?? '';
+            }).join('\t'));
+            return header + '\n' + rows.join('\n');
+        }
+
+        function doCopy(text, btn, label) {
             navigator.clipboard.writeText(text).then(() => {
+                const orig = btn.textContent;
                 btn.textContent = '복사됨';
                 btn.classList.add('copied');
-                setTimeout(() => { btn.textContent = '복사'; btn.classList.remove('copied'); }, 1500);
+                setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
+            }).catch(() => {
+                // fallback
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.cssText = 'position:fixed;opacity:0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                const orig = btn.textContent;
+                btn.textContent = '복사됨';
+                btn.classList.add('copied');
+                setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
             });
         }
 
@@ -604,47 +655,75 @@
             const msg = document.createElement('div');
             msg.className = `message ${isUser ? 'user' : 'bot'}`;
 
-            const bubble = document.createElement('div');
-            bubble.className = 'bubble';
-
             if (isUser) {
+                const bubble = document.createElement('div');
+                bubble.className = 'bubble';
                 bubble.textContent = text;
+                msg.appendChild(bubble);
             } else {
-                const copyBtn = document.createElement('button');
-                copyBtn.className = 'copy-btn';
-                copyBtn.textContent = '복사';
-                copyBtn.onclick = () => copyText(text, copyBtn);
-                bubble.appendChild(copyBtn);
-                bubble.innerHTML += formatText(text);
+                const bubble = document.createElement('div');
+                bubble.className = 'bubble';
 
-                if (meta && meta.data && Array.isArray(meta.data) && meta.data.length > 0) {
-                    bubble.innerHTML += buildTable(meta.data);
-                }
-            }
+                const hasTable = meta && meta.data && Array.isArray(meta.data) && meta.data.length > 0;
 
-            msg.appendChild(bubble);
+                // 글 영역
+                const textDiv = document.createElement('div');
+                textDiv.className = 'answer-text';
+                textDiv.innerHTML = formatText(text);
+                bubble.appendChild(textDiv);
 
-            if (meta && !isUser) {
-                const metaDiv = document.createElement('div');
-                metaDiv.className = 'meta';
-
-                if (meta.sql) {
-                    const sqlDiv = document.createElement('div');
-                    sqlDiv.className = 'meta-sql';
-                    sqlDiv.textContent = meta.sql;
-                    metaDiv.appendChild(sqlDiv);
+                // 표 영역
+                if (hasTable) {
+                    const tableWrap = document.createElement('div');
+                    tableWrap.className = 'answer-table-wrap';
+                    tableWrap.innerHTML = buildTableHTML(meta.data);
+                    bubble.appendChild(tableWrap);
                 }
 
-                if (meta.sources && meta.sources.length > 0) {
-                    const srcDiv = document.createElement('div');
-                    srcDiv.className = 'meta-sources';
-                    srcDiv.textContent = '출처: ' + meta.sources.map(s =>
-                        `${s.doc_id} (${(s.similarity * 100).toFixed(0)}%)`
-                    ).join(', ');
-                    metaDiv.appendChild(srcDiv);
+                // 복사 버튼 바
+                const copyBar = document.createElement('div');
+                copyBar.className = 'copy-bar';
+
+                const copyTextBtn = document.createElement('button');
+                copyTextBtn.className = 'copy-btn';
+                copyTextBtn.textContent = '글 복사';
+                copyTextBtn.onclick = () => doCopy(text, copyTextBtn);
+                copyBar.appendChild(copyTextBtn);
+
+                if (hasTable) {
+                    const copyTableBtn = document.createElement('button');
+                    copyTableBtn.className = 'copy-btn';
+                    copyTableBtn.textContent = '표 복사';
+                    copyTableBtn.onclick = () => doCopy(tableDataToTSV(meta.data), copyTableBtn);
+                    copyBar.appendChild(copyTableBtn);
                 }
 
-                if (metaDiv.children.length > 0) msg.appendChild(metaDiv);
+                bubble.appendChild(copyBar);
+                msg.appendChild(bubble);
+
+                // 메타 정보 (SQL, 출처)
+                if (meta) {
+                    const metaDiv = document.createElement('div');
+                    metaDiv.className = 'meta';
+
+                    if (meta.sql) {
+                        const sqlDiv = document.createElement('div');
+                        sqlDiv.className = 'meta-sql';
+                        sqlDiv.textContent = meta.sql;
+                        metaDiv.appendChild(sqlDiv);
+                    }
+
+                    if (meta.sources && meta.sources.length > 0) {
+                        const srcDiv = document.createElement('div');
+                        srcDiv.className = 'meta-sources';
+                        srcDiv.textContent = '출처: ' + meta.sources.map(s =>
+                            `${s.doc_id} (${(s.similarity * 100).toFixed(0)}%)`
+                        ).join(', ');
+                        metaDiv.appendChild(srcDiv);
+                    }
+
+                    if (metaDiv.children.length > 0) msg.appendChild(metaDiv);
+                }
             }
 
             chatArea.appendChild(msg);
