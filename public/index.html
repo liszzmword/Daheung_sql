@@ -3,325 +3,331 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>세일즈 RAG 챗봇</title>
+    <title>대흥 세일즈 조회</title>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --bg: #fafafa;
+            --surface: #fff;
+            --border: #e5e5e5;
+            --text: #1a1a1a;
+            --text-sub: #737373;
+            --accent: #171717;
+            --accent-light: #f5f5f5;
+            --radius: 8px;
         }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-
-        .container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            width: 100%;
-            max-width: 900px;
-            height: 650px;
+            font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            height: 100dvh;
             display: flex;
             flex-direction: column;
-            overflow: hidden;
         }
 
+        /* 헤더 */
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            text-align: center;
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
         }
 
         .header h1 {
-            font-size: 24px;
-            font-weight: 700;
-            margin-bottom: 5px;
-        }
-
-        .header p {
-            font-size: 14px;
-            font-weight: 400;
-            opacity: 0.9;
-        }
-
-        .mode-selector {
-            display: flex;
-            padding: 15px 20px;
-            background: #f9f9f9;
-            gap: 10px;
-            border-bottom: 1px solid #e0e0e0;
-        }
-
-        .mode-btn {
-            flex: 1;
-            padding: 10px;
-            border: 2px solid #e0e0e0;
-            background: white;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 14px;
+            font-size: 16px;
             font-weight: 600;
-            transition: all 0.3s;
+            letter-spacing: -0.02em;
         }
 
-        .mode-btn.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-color: #667eea;
+        /* 모드 토글 */
+        .mode-toggle {
+            display: flex;
+            background: var(--accent-light);
+            border-radius: 6px;
+            padding: 2px;
+            gap: 2px;
         }
 
-        .mode-btn:hover:not(.active) {
-            border-color: #667eea;
-            transform: translateY(-2px);
+        .mode-toggle button {
+            padding: 6px 14px;
+            border: none;
+            background: transparent;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-sub);
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: inherit;
         }
 
+        .mode-toggle button.active {
+            background: var(--surface);
+            color: var(--text);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+        }
+
+        /* 채팅 영역 */
         .chat-area {
             flex: 1;
-            padding: 20px;
             overflow-y: auto;
-            background: #f7f7f7;
+            padding: 20px 24px;
         }
 
         .message {
-            margin-bottom: 15px;
-            animation: fadeIn 0.3s ease-in;
-            position: relative;
+            margin-bottom: 16px;
+            animation: fadeIn 0.2s ease;
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
+            from { opacity: 0; transform: translateY(4px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
         .message.user {
-            text-align: right;
+            display: flex;
+            justify-content: flex-end;
         }
 
-        .message-bubble {
-            display: inline-block;
-            padding: 12px 18px;
-            border-radius: 18px;
-            max-width: 70%;
-            word-wrap: break-word;
+        .bubble {
+            max-width: 75%;
+            padding: 10px 14px;
+            border-radius: var(--radius);
+            font-size: 14px;
+            line-height: 1.6;
+            word-break: keep-all;
+            overflow-wrap: break-word;
+        }
+
+        .message.user .bubble {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .message.bot .bubble {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            white-space: pre-wrap;
             position: relative;
         }
 
-        .message.user .message-bubble {
-            background: #667eea;
-            color: white;
-        }
-
-        .message.bot .message-bubble {
-            background: white;
-            color: #333;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            white-space: pre-wrap;
-        }
-
-        .message.bot .message-bubble strong {
-            font-weight: 700;
-            color: #667eea;
-        }
-
-        .message.bot .data-table {
-            margin-top: 10px;
-            overflow-x: auto;
-        }
-
-        .message.bot table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-            font-size: 13px;
-        }
-
-        .message.bot table th,
-        .message.bot table td {
-            border: 1px solid #ddd;
-            padding: 8px 12px;
-            text-align: left;
-        }
-
-        .message.bot table th {
-            background: #667eea;
-            color: white;
+        .message.bot .bubble strong {
             font-weight: 600;
         }
 
-        .message.bot table tr:nth-child(even) {
-            background: #f9f9f9;
+        /* 메타 정보 (SQL, 출처) */
+        .meta {
+            margin-top: 6px;
+            max-width: 75%;
         }
 
-        .message.bot table tr:hover {
-            background: #f0f0f0;
+        .meta-sql {
+            font-size: 12px;
+            font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+            color: var(--text-sub);
+            background: var(--accent-light);
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 4px;
+            overflow-x: auto;
         }
 
+        .meta-sources {
+            font-size: 11px;
+            color: var(--text-sub);
+        }
+
+        /* 테이블 */
+        .data-table {
+            margin-top: 10px;
+            overflow-x: auto;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+
+        .data-table table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        .data-table th {
+            background: var(--accent-light);
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            color: var(--text-sub);
+            position: sticky;
+            top: 0;
+        }
+
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .data-table tr:hover td {
+            background: var(--accent-light);
+        }
+
+        /* 복사 버튼 */
         .copy-btn {
             position: absolute;
-            top: 8px;
-            right: 8px;
-            padding: 4px 8px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 6px;
+            top: 6px;
+            right: 6px;
+            padding: 3px 8px;
+            background: var(--accent-light);
+            border: 1px solid var(--border);
+            border-radius: 4px;
             font-size: 11px;
             cursor: pointer;
             opacity: 0;
-            transition: opacity 0.2s;
+            transition: opacity 0.15s;
+            font-family: inherit;
+            color: var(--text-sub);
         }
 
-        .message.bot:hover .copy-btn {
-            opacity: 1;
+        .message.bot:hover .copy-btn { opacity: 1; }
+        .copy-btn:hover { background: var(--border); }
+        .copy-btn.copied { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+
+        /* 예시 질문 */
+        .examples {
+            padding: 8px 24px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+            font-size: 13px;
+            color: var(--text-sub);
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            flex-shrink: 0;
         }
 
-        .copy-btn:hover {
-            background: #5568d3;
-        }
-
-        .copy-btn.copied {
-            background: #10b981;
-        }
-
-        .message.bot .sql-info {
-            margin-top: 10px;
-            padding: 10px;
-            background: #f0f0f0;
-            border-radius: 8px;
+        .examples span {
+            flex-shrink: 0;
+            padding: 4px 10px;
+            background: var(--accent-light);
+            border-radius: 100px;
+            cursor: pointer;
+            transition: background 0.15s;
             font-size: 12px;
-            font-family: 'Consolas', 'Monaco', monospace;
-            color: #555;
         }
 
-        .message.bot .sources {
-            margin-top: 10px;
-            font-size: 12px;
-            color: #666;
+        .examples span:hover {
+            background: var(--border);
         }
 
+        /* 입력 영역 */
         .input-area {
-            padding: 20px;
-            background: white;
-            border-top: 1px solid #e0e0e0;
+            padding: 16px 24px;
+            border-top: 1px solid var(--border);
+            background: var(--surface);
+            flex-shrink: 0;
         }
 
         .input-form {
             display: flex;
-            gap: 10px;
+            gap: 8px;
         }
 
         #questionInput {
             flex: 1;
-            padding: 12px 18px;
-            border: 2px solid #e0e0e0;
-            border-radius: 25px;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
             font-size: 14px;
+            font-family: inherit;
             outline: none;
-            transition: border-color 0.3s;
+            transition: border-color 0.15s;
+            background: var(--bg);
         }
 
         #questionInput:focus {
-            border-color: #667eea;
+            border-color: var(--accent);
         }
 
         #sendButton {
-            padding: 12px 30px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 25px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-
-        #sendButton:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        #sendButton:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .example-questions {
             padding: 10px 20px;
-            background: #f0f0f0;
-            font-size: 12px;
-            color: #666;
-            text-align: center;
-        }
-
-        .example-questions span {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 14px;
+            font-weight: 500;
             cursor: pointer;
-            color: #667eea;
-            text-decoration: underline;
-            margin: 0 8px;
+            font-family: inherit;
+            transition: opacity 0.15s;
         }
 
-        .example-questions span:hover {
-            color: #764ba2;
+        #sendButton:hover:not(:disabled) { opacity: 0.85; }
+        #sendButton:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* 로딩 */
+        .loading-dots {
+            display: inline-flex;
+            gap: 4px;
+            padding: 4px 0;
+        }
+
+        .loading-dots span {
+            width: 6px;
+            height: 6px;
+            background: var(--text-sub);
+            border-radius: 50%;
+            animation: dot 1.2s ease-in-out infinite;
+        }
+
+        .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes dot {
+            0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+            40% { opacity: 1; transform: scale(1); }
+        }
+
+        /* 모바일 */
+        @media (max-width: 640px) {
+            .header { padding: 12px 16px; }
+            .chat-area { padding: 16px; }
+            .examples { padding: 8px 16px; }
+            .input-area { padding: 12px 16px; }
+            .bubble { max-width: 88%; }
+            .meta { max-width: 88%; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🤖 세일즈 AI 챗봇</h1>
-            <p>문서 질의응답 & 데이터 조회</p>
+    <div class="header">
+        <h1>대흥 세일즈</h1>
+        <div class="mode-toggle">
+            <button id="ragMode" class="active" onclick="switchMode('rag')">문서</button>
+            <button id="sqlMode" onclick="switchMode('sql')">데이터</button>
         </div>
+    </div>
 
-        <div class="mode-selector">
-            <button class="mode-btn active" id="ragMode" onclick="switchMode('rag')">
-                📚 RAG 모드 (문서 질의응답)
-            </button>
-            <button class="mode-btn" id="sqlMode" onclick="switchMode('sql')">
-                🔍 SQL 모드 (데이터 조회)
-            </button>
-        </div>
+    <div class="examples" id="exampleQuestions"></div>
+    <div class="chat-area" id="chatArea"></div>
 
-        <div class="example-questions" id="exampleQuestions"></div>
-
-        <div class="chat-area" id="chatArea"></div>
-
-        <div class="input-area">
-            <form class="input-form" onsubmit="sendQuestion(event)">
-                <input
-                    type="text"
-                    id="questionInput"
-                    placeholder="질문을 입력하세요..."
-                    autocomplete="off"
-                    required
-                >
-                <button type="submit" id="sendButton">전송</button>
-            </form>
-        </div>
+    <div class="input-area">
+        <form class="input-form" onsubmit="sendQuestion(event)">
+            <input type="text" id="questionInput" placeholder="질문을 입력하세요" autocomplete="off" required>
+            <button type="submit" id="sendButton">전송</button>
+        </form>
     </div>
 
     <script>
@@ -329,19 +335,10 @@
         const chatArea = document.getElementById('chatArea');
         const questionInput = document.getElementById('questionInput');
         const sendButton = document.getElementById('sendButton');
-        const exampleQuestions = document.getElementById('exampleQuestions');
 
         const examples = {
-            rag: [
-                '매출 계산 방법은?',
-                '이탈 고객은 어떻게 정의하나요?',
-                '마진율이란 무엇인가요?'
-            ],
-            sql: [
-                '2024년 전체 매출은?',
-                '2024년 상위 10개 거래처 알려줘',
-                '김도순 담당 2024년 매출은?'
-            ]
+            rag: ['매출 계산 방법은?', '이탈 고객 정의', '마진율이란?'],
+            sql: ['2024년 전체 매출', '상위 10개 거래처', '김도순 담당 2024년 매출']
         };
 
         function switchMode(mode) {
@@ -349,207 +346,166 @@
             document.getElementById('ragMode').classList.toggle('active', mode === 'rag');
             document.getElementById('sqlMode').classList.toggle('active', mode === 'sql');
             updateExamples();
-            addWelcomeMessage();
+            chatArea.innerHTML = '';
+            addMessage(mode === 'rag'
+                ? '비즈니스 규칙, 데이터 정의 등에 대해 질문하세요.'
+                : '매출 데이터를 조회할 수 있습니다. 연도, 거래처, 담당자 등으로 질문하세요.',
+                false);
         }
 
         function updateExamples() {
-            const exs = examples[currentMode];
-            exampleQuestions.innerHTML = '예시: ' + exs.map(q =>
-                `<span onclick="askQuestion('${q}')">${q}</span>`
+            const el = document.getElementById('exampleQuestions');
+            el.innerHTML = examples[currentMode].map(q =>
+                `<span onclick="fillQuestion('${q}')">${q}</span>`
             ).join('');
         }
 
-        function addWelcomeMessage() {
-            chatArea.innerHTML = '';
-            const welcomeMsg = currentMode === 'rag'
-                ? '📚 RAG 모드입니다.\n비즈니스 규칙, 데이터 정의, 지표 계산 방법 등에 대해 질문해주세요.'
-                : '🔍 SQL 모드입니다.\n실제 매출 데이터를 조회할 수 있습니다. 연도, 거래처, 담당자 등으로 질문해보세요.';
-
-            addMessage(welcomeMsg, false);
+        function fillQuestion(q) {
+            questionInput.value = q;
+            questionInput.focus();
         }
 
-        function formatMarkdown(text) {
-            // **bold** -> <strong>bold</strong>
+        function formatText(text) {
             text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-
-            // *italic* -> <em>italic</em>
             text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
-
             return text;
         }
 
-        function parseTable(data) {
-            // JSON 배열을 HTML 테이블로 변환
-            if (!Array.isArray(data) || data.length === 0) return null;
-
+        function buildTable(data) {
+            if (!Array.isArray(data) || data.length === 0) return '';
             const keys = Object.keys(data[0]);
-            let html = '<table><thead><tr>';
-
-            keys.forEach(key => {
-                html += `<th>${key}</th>`;
-            });
-
+            let html = '<div class="data-table"><table><thead><tr>';
+            keys.forEach(k => html += `<th>${k}</th>`);
             html += '</tr></thead><tbody>';
-
             data.forEach(row => {
                 html += '<tr>';
-                keys.forEach(key => {
-                    let value = row[key];
-                    // 숫자 포맷팅
-                    if (typeof value === 'number' && value > 1000) {
-                        value = value.toLocaleString('ko-KR');
-                    }
-                    html += `<td>${value}</td>`;
+                keys.forEach(k => {
+                    let v = row[k];
+                    if (typeof v === 'number' && v > 1000) v = v.toLocaleString('ko-KR');
+                    html += `<td>${v}</td>`;
                 });
                 html += '</tr>';
             });
-
-            html += '</tbody></table>';
+            html += '</tbody></table></div>';
             return html;
         }
 
-        function copyToClipboard(text, button) {
+        function copyText(text, btn) {
             navigator.clipboard.writeText(text).then(() => {
-                const originalText = button.textContent;
-                button.textContent = '✓ 복사됨';
-                button.classList.add('copied');
-
-                setTimeout(() => {
-                    button.textContent = originalText;
-                    button.classList.remove('copied');
-                }, 2000);
+                btn.textContent = '복사됨';
+                btn.classList.add('copied');
+                setTimeout(() => { btn.textContent = '복사'; btn.classList.remove('copied'); }, 1500);
             });
         }
 
         function addMessage(text, isUser, meta = null) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+            const msg = document.createElement('div');
+            msg.className = `message ${isUser ? 'user' : 'bot'}`;
 
-            const bubbleDiv = document.createElement('div');
-            bubbleDiv.className = 'message-bubble';
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
 
-            if (!isUser) {
-                // 복사 버튼 추가
+            if (isUser) {
+                bubble.textContent = text;
+            } else {
                 const copyBtn = document.createElement('button');
                 copyBtn.className = 'copy-btn';
-                copyBtn.textContent = '📋 복사';
-                copyBtn.onclick = () => copyToClipboard(text, copyBtn);
-                bubbleDiv.appendChild(copyBtn);
+                copyBtn.textContent = '복사';
+                copyBtn.onclick = () => copyText(text, copyBtn);
+                bubble.appendChild(copyBtn);
+                bubble.innerHTML += formatText(text);
 
-                // 마크다운 포맷팅
-                const formattedText = formatMarkdown(text);
-                bubbleDiv.innerHTML += formattedText;
-
-                // 테이블 데이터 처리
                 if (meta && meta.data && Array.isArray(meta.data) && meta.data.length > 0) {
-                    const tableHtml = parseTable(meta.data);
-                    if (tableHtml) {
-                        const tableDiv = document.createElement('div');
-                        tableDiv.className = 'data-table';
-                        tableDiv.innerHTML = tableHtml;
-                        bubbleDiv.appendChild(tableDiv);
-                    }
+                    bubble.innerHTML += buildTable(meta.data);
                 }
-            } else {
-                bubbleDiv.textContent = text;
             }
 
-            messageDiv.appendChild(bubbleDiv);
+            msg.appendChild(bubble);
 
             if (meta && !isUser) {
+                const metaDiv = document.createElement('div');
+                metaDiv.className = 'meta';
+
                 if (meta.sql) {
                     const sqlDiv = document.createElement('div');
-                    sqlDiv.className = 'sql-info';
-                    sqlDiv.textContent = '💻 SQL: ' + meta.sql;
-                    messageDiv.appendChild(sqlDiv);
+                    sqlDiv.className = 'meta-sql';
+                    sqlDiv.textContent = meta.sql;
+                    metaDiv.appendChild(sqlDiv);
                 }
+
                 if (meta.sources && meta.sources.length > 0) {
-                    const sourcesDiv = document.createElement('div');
-                    sourcesDiv.className = 'sources';
-                    sourcesDiv.textContent = '📚 출처: ' + meta.sources.map(s =>
-                        `${s.doc_id} (${(s.similarity * 100).toFixed(1)}%)`
+                    const srcDiv = document.createElement('div');
+                    srcDiv.className = 'meta-sources';
+                    srcDiv.textContent = '출처: ' + meta.sources.map(s =>
+                        `${s.doc_id} (${(s.similarity * 100).toFixed(0)}%)`
                     ).join(', ');
-                    messageDiv.appendChild(sourcesDiv);
+                    metaDiv.appendChild(srcDiv);
                 }
+
+                if (metaDiv.children.length > 0) msg.appendChild(metaDiv);
             }
 
-            chatArea.appendChild(messageDiv);
+            chatArea.appendChild(msg);
             chatArea.scrollTop = chatArea.scrollHeight;
         }
 
-        function addLoadingMessage() {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message bot';
-            messageDiv.id = 'loadingMessage';
-
-            const bubbleDiv = document.createElement('div');
-            bubbleDiv.className = 'message-bubble';
-            bubbleDiv.innerHTML = '<div class="loading"></div>';
-
-            messageDiv.appendChild(bubbleDiv);
-            chatArea.appendChild(messageDiv);
+        function showLoading() {
+            const msg = document.createElement('div');
+            msg.className = 'message bot';
+            msg.id = 'loadingMessage';
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
+            msg.appendChild(bubble);
+            chatArea.appendChild(msg);
             chatArea.scrollTop = chatArea.scrollHeight;
         }
 
-        function removeLoadingMessage() {
-            const loadingMsg = document.getElementById('loadingMessage');
-            if (loadingMsg) {
-                loadingMsg.remove();
-            }
+        function hideLoading() {
+            const el = document.getElementById('loadingMessage');
+            if (el) el.remove();
         }
 
-        async function sendQuestion(event) {
-            event.preventDefault();
+        async function sendQuestion(e) {
+            e.preventDefault();
+            const q = questionInput.value.trim();
+            if (!q) return;
 
-            const question = questionInput.value.trim();
-            if (!question) return;
-
-            addMessage(question, true);
+            addMessage(q, true);
             questionInput.value = '';
-
-            addLoadingMessage();
+            showLoading();
             sendButton.disabled = true;
 
             try {
                 const endpoint = currentMode === 'rag' ? '/api/query' : '/api/query-sql';
-
-                const response = await fetch(endpoint, {
+                const res = await fetch(endpoint, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ question }),
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: q }),
                 });
-
-                const data = await response.json();
-
-                removeLoadingMessage();
+                const data = await res.json();
+                hideLoading();
 
                 if (data.success) {
                     const meta = currentMode === 'rag'
                         ? { sources: data.sources }
                         : { sql: data.sql, data: data.data };
-
                     addMessage(data.answer, false, meta);
                 } else {
-                    addMessage('❌ 오류: ' + (data.error || '알 수 없는 오류'), false);
+                    addMessage('오류: ' + (data.error || '알 수 없는 오류'), false);
                 }
-            } catch (error) {
-                removeLoadingMessage();
-                addMessage('❌ 서버 연결 오류: ' + error.message, false);
+            } catch (err) {
+                hideLoading();
+                addMessage('연결 오류: ' + err.message, false);
             } finally {
                 sendButton.disabled = false;
                 questionInput.focus();
             }
         }
 
-        function askQuestion(question) {
-            questionInput.value = question;
-            questionInput.focus();
-        }
-
+        // 초기화
         updateExamples();
-        addWelcomeMessage();
+        switchMode('sql');
     </script>
 </body>
 </html>

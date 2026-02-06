@@ -1,56 +1,31 @@
 import "dotenv/config";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+import { supabase, EMBED_DIM } from "../lib/clients.mjs";
 
 async function checkFunctions() {
-  console.log("\n🔍 Supabase 함수 확인\n");
-  console.log("=".repeat(80) + "\n");
+  console.log("\nSupabase RPC 함수 확인\n");
 
-  // 1. match_documents 함수 확인
-  console.log("1️⃣  match_documents 함수 확인...");
+  // match_documents
   try {
-    const testEmbedding = new Array(1536).fill(0);
-    const { data, error } = await supabase.rpc("match_documents", {
+    const testEmbedding = new Array(EMBED_DIM).fill(0);
+    const { error } = await supabase.rpc("match_documents", {
       query_embedding: testEmbedding,
       match_threshold: 0.5,
       match_count: 1,
     });
-
-    if (error) {
-      console.log("   ❌ match_documents 함수 없음");
-      console.log(`   오류: ${error.message}\n`);
-    } else {
-      console.log("   ✅ match_documents 함수 존재\n");
-    }
+    console.log(error ? `  match_documents: 실패 (${error.message})` : "  match_documents: 정상");
   } catch (err) {
-    console.log("   ❌ match_documents 함수 없음");
-    console.log(`   오류: ${err.message}\n`);
+    console.log(`  match_documents: 실패 (${err.message})`);
   }
 
-  // 2. exec_sql 함수 확인
-  console.log("2️⃣  exec_sql 함수 확인...");
+  // exec_sql
   try {
-    const { data, error } = await supabase.rpc("exec_sql", {
-      query: "SELECT 1 as test",
-    });
-
-    if (error) {
-      console.log("   ❌ exec_sql 함수 없음");
-      console.log(`   오류: ${error.message}\n`);
-    } else {
-      console.log("   ✅ exec_sql 함수 존재\n");
-    }
+    const { error } = await supabase.rpc("exec_sql", { query: "SELECT 1 as test" });
+    console.log(error ? `  exec_sql: 실패 (${error.message})` : "  exec_sql: 정상");
   } catch (err) {
-    console.log("   ❌ exec_sql 함수 없음");
-    console.log(`   오류: ${err.message}\n`);
+    console.log(`  exec_sql: 실패 (${err.message})`);
   }
 
-  console.log("=".repeat(80));
-  console.log("\n💡 함수가 없으면 Supabase SQL Editor에서 생성하세요.\n");
+  console.log();
 }
 
 checkFunctions();
