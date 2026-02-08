@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   try {
     validateEnv();
 
-    const { mode, limit = "30", offset = "0" } = req.query;
+    const { mode, limit = "30", offset = "0", from, to } = req.query;
     const limitNum = Math.min(Number(limit) || 30, 100);
     const offsetNum = Number(offset) || 0;
 
@@ -28,6 +28,14 @@ export default async function handler(req, res) {
 
     if (mode && (mode === "rag" || mode === "sql")) {
       query = query.eq("mode", mode);
+    }
+
+    // 날짜 필터
+    if (from) {
+      query = query.gte("created_at", `${from}T00:00:00`);
+    }
+    if (to) {
+      query = query.lte("created_at", `${to}T23:59:59`);
     }
 
     const { data, error, count } = await query;
