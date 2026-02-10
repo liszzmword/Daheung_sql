@@ -19,12 +19,15 @@ export default async function handler(req, res) {
   try {
     validateEnv();
 
-    const { question } = req.body;
+    const { question, history = [] } = req.body;
     if (!question || typeof question !== "string" || question.trim() === "") {
       return res.status(400).json({ error: "질문을 입력해주세요." });
     }
 
     const q = question.trim();
+    // history 안전성: 배열이고 최대 10턴만 허용
+    const safeHistory = Array.isArray(history) ? history.slice(-10) : [];
+
     const embedding = await embedQuery(q);
     const docs = await searchRelevantDocs(embedding, { count: 5 });
 
@@ -40,7 +43,7 @@ export default async function handler(req, res) {
     }
 
     const context = buildContext(docs);
-    const answer = await generateRAGAnswer(q, context);
+    const answer = await generateRAGAnswer(q, context, safeHistory);
     const sources = docs.map((d) => ({ doc_id: d.doc_id, similarity: d.similarity }));
 
     logQuery({ mode: "rag", question: q, answer, sources, success: true });

@@ -20,20 +20,22 @@ export default async function handler(req, res) {
   try {
     validateEnv();
 
-    const { question } = req.body;
+    const { question, history = [] } = req.body;
     if (!question || typeof question !== "string" || question.trim() === "") {
       return res.status(400).json({ error: "질문을 입력해주세요." });
     }
 
     const q = question.trim();
+    // history 안전성: 배열이고 최대 10턴만 허용
+    const safeHistory = Array.isArray(history) ? history.slice(-10) : [];
 
     // 1. RAG 검색으로 비즈니스 규칙 가져오기
     const embedding = await embedQuery(q);
     const docs = await searchRelevantDocs(embedding);
     const ragContext = buildContext(docs) || "기본 스키마 사용";
 
-    // 2. SQL 생성 + 실행 (실패 시 1회 재시도)
-    const { sql, result } = await generateAndExecuteSQL(q, ragContext);
+    // 2. SQL 생성 + 실행 (실패 시 1회 재시도, 대화 이력 전달)
+    const { sql, result } = await generateAndExecuteSQL(q, ragContext, 1, safeHistory);
 
     if (!result.success) {
       logQuery({ mode: "sql", question: q, sql_generated: sql, success: false, error_message: result.error });
