@@ -1,8 +1,5 @@
 node_modules/
 .env
-.env.local
 .vercel
-*.log
-.DS_Store
-.claude/
 desktop.ini
+package.json.broken

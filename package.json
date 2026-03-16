@@ -9,7 +9,9 @@
     "query": "node scripts/query_rag.mjs",
     "chat": "node scripts/chat.mjs",
     "query-sql": "node scripts/query_sql.mjs",
-    "chat-sql": "node scripts/chat_sql.mjs"
+    "chat-sql": "node scripts/chat_sql.mjs",
+    "sync-sales": "node scripts/sync_sales.mjs",
+    "sync-diary": "node scripts/sync_diary.mjs"
   },
   "keywords": [],
   "author": "",
@@ -17,6 +19,9 @@
   "dependencies": {
     "@google/genai": "^1.39.0",
     "@supabase/supabase-js": "^2.94.0",
-    "dotenv": "^17.2.3"
+    "csv-parse": "^5.5.0",
+    "dotenv": "^17.2.3",
+    "formidable": "^3.5.0",
+    "xlsx": "^0.18.5"
   }
 }

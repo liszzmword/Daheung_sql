@@ -116,3 +116,70 @@ RAG 검색 대상 문서로 사용된다.
 - total_amount = supply_amount + vat 성립 여부 점검
 - qty * unit_price ≈ supply_amount 성립 여부 점검(일부 품목/서비스(금형비 등)는 예외 가능)
 - customer_name 표기 중복/오타 탐지(가능하면 customer_code로 통합)
+
+---
+
+## 영업일지 테이블 (sales_diary)
+
+### 테이블 개요
+- 단위: 영업사원의 개별 방문/상담 기록 (한 행 = 특정 거래처 방문 1건)
+- 출처: 영업일지 XLS 파일 (시트 이름 = 영업사원 이름)
+- sales_clean 테이블과 연결: company_name ↔ customer_name, sales_rep 대응
+
+### 컬럼 정의
+
+#### diary_date
+- 의미: 방문/상담 일자
+- 타입: date
+- 예시: `2024-12-02`
+
+#### sales_rep
+- 의미: 영업사원 이름 (XLS 시트 이름에서 추출)
+- 타입: text
+- 예시: `김한섭`, `박세용`
+
+#### company_name
+- 의미: 방문한 기업명
+- 타입: text
+- 예시: `현대자동차`, `삼성전자`
+- 주의: sales_clean의 customer_name과 표기가 다를 수 있음
+
+#### contact_person
+- 의미: 기업 담당자 이름
+- 타입: text
+- 예시: `김부장`
+
+#### start_time
+- 의미: 영업 시작 시간
+- 타입: text
+- 예시: `09:00`
+
+#### end_time
+- 의미: 영업 끝나는 시간
+- 타입: text
+- 예시: `10:30`
+
+#### visit_type
+- 의미: 방문 유형 또는 제품명
+- 타입: text
+- 예시: `방문`, `PS양면`
+
+#### notes
+- 의미: 상담/방문 내용 상세
+- 타입: text
+- 예시: `신규 제품 샘플 전달, 견적 요청 받음`
+
+#### source_file
+- 의미: 원본 XLS 파일명
+- 타입: text
+- 예시: `12월영업일지.xls`
+
+#### inserted_at
+- 의미: 데이터 입력 시각
+- 타입: timestamptz
+- 자동 생성 (now())
+
+### 활용 예시
+- "12월 방문 기록 알려줘" → `SELECT * FROM sales_diary WHERE diary_date BETWEEN '2024-12-01' AND '2024-12-31'`
+- "김한섭 영업일지" → `SELECT * FROM sales_diary WHERE sales_rep = '김한섭' ORDER BY diary_date DESC`
+- "현대자동차 상담 내용" → `SELECT * FROM sales_diary WHERE company_name LIKE '%현대자동차%'`
