@@ -98,11 +98,12 @@ async function processSalesCSV(buffer, filename) {
       margin_rate_pct: parsePercent(row.margin_rate_pct),
       vat: parseNumber(row.vat),
       total_amount: parseNumber(row.total_amount),
+      source_file: filename,
     }))
     .filter((r) => r.sale_date && r.customer_name);
 
-  // 전체 교체
-  await supabase.from("sales_clean").delete().neq("id", 0);
+  // 파일 단위 교체: 같은 파일명의 기존 데이터만 삭제
+  await supabase.from("sales_clean").delete().eq("source_file", filename);
 
   const BATCH = 500;
   let inserted = 0;

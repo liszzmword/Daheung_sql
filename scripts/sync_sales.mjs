@@ -5,7 +5,7 @@
  *   npm run sync-sales -- <파일경로>
  *   node scripts/sync_sales.mjs "path/to/sales_data.csv"
  *
- * 동작: source_file이 같은 기존 데이터를 삭제 후 재삽입 (파일 단위 교체)
+ * 동작: 같은 파일명(source_file)의 기존 데이터만 삭제 후 재삽입 (추가 방식)
  */
 import "dotenv/config";
 import fs from "fs";
@@ -62,7 +62,7 @@ function parseDate(val) {
 }
 
 /** CSV 행을 sales_clean 레코드로 변환 */
-function transformRow(row) {
+function transformRow(row, sourceFile) {
   return {
     row_no: parseNumber(row.row_no),
     sale_date: parseDate(row.sale_date),
@@ -77,6 +77,7 @@ function transformRow(row) {
     margin_rate_pct: parsePercent(row.margin_rate_pct),
     vat: parseNumber(row.vat),
     total_amount: parseNumber(row.total_amount),
+    source_file: sourceFile,
   };
 }
 
@@ -112,16 +113,15 @@ async function main() {
   }
 
   // 2. 데이터 변환
-  const transformed = records.map(transformRow).filter((r) => r.sale_date && r.customer_name);
+  const transformed = records.map((r) => transformRow(r, filename)).filter((r) => r.sale_date && r.customer_name);
   console.log(`  ${transformed.length}건 유효 데이터`);
 
-  // 3. 전체 교체: 기존 데이터 모두 삭제 후 재삽입
-  // sales_clean 테이블의 모든 데이터를 삭제 (CSV가 전체 데이터를 포함하므로)
-  console.log(`\n  기존 데이터 삭제 중...`);
+  // 3. 파일 단위 교체: 같은 source_file 데이터만 삭제 후 재삽입
+  console.log(`\n  기존 데이터 삭제 중 (source_file: ${filename})...`);
   const { error: delError } = await supabase
     .from("sales_clean")
     .delete()
-    .neq("id", 0); // 모든 행 삭제 (Supabase는 무조건 where 필요)
+    .eq("source_file", filename);
   if (delError) throw new Error(`삭제 오류: ${delError.message}`);
 
   // 4. Batch insert
