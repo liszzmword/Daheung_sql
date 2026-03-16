@@ -405,20 +405,17 @@
             <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
                 <div>파일을 드래그하거나 클릭하여 선택</div>
                 <p>.csv (세일즈) / .xls, .xlsx (영업일지)</p>
+                <p style="font-size:11px;margin-top:2px">영업일지 파일명 예: sales_diary_2026_01.xls</p>
                 <div class="filename" id="uploadFilename"></div>
             </div>
             <input type="file" id="fileInput" accept=".csv,.xls,.xlsx" style="display:none" onchange="handleFileSelect(this)">
             <div class="upload-options" id="uploadOptions" style="display:none">
                 <div style="flex:1">
                     <label>유형</label><br>
-                    <select id="uploadType" style="width:100%" onchange="toggleYearInput()">
+                    <select id="uploadType" style="width:100%">
                         <option value="sales">세일즈 CSV</option>
                         <option value="diary">영업일지 XLS</option>
                     </select>
-                </div>
-                <div style="flex:1" id="yearInputWrap" style="display:none">
-                    <label>연도</label><br>
-                    <input type="number" id="uploadYear" min="2000" max="2100" style="width:100%" placeholder="2025">
                 </div>
             </div>
             <button class="upload-btn" id="uploadBtn" onclick="doUpload()" disabled>업로드</button>
@@ -805,16 +802,6 @@
             } else {
                 typeSelect.value = 'diary';
             }
-            toggleYearInput();
-        }
-
-        function toggleYearInput() {
-            const type = document.getElementById('uploadType').value;
-            const yearWrap = document.getElementById('yearInputWrap');
-            yearWrap.style.display = type === 'diary' ? '' : 'none';
-            if (type === 'diary' && !document.getElementById('uploadYear').value) {
-                document.getElementById('uploadYear').value = new Date().getFullYear();
-            }
         }
 
         async function doUpload() {
@@ -827,12 +814,10 @@
             resultEl.style.display = 'none';
 
             const type = document.getElementById('uploadType').value;
-            const year = document.getElementById('uploadYear').value;
 
             const formData = new FormData();
             formData.append('file', uploadFile);
             formData.append('type', type);
-            if (type === 'diary') formData.append('year', year);
 
             try {
                 const res = await fetch('/api/upload', {

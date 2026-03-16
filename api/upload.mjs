@@ -1,7 +1,8 @@
 /**
  * 파일 업로드 API (세일즈 CSV / 영업일지 XLS)
  * POST /api/upload
- * multipart/form-data: file, type(sales|diary), year(diary용)
+ * multipart/form-data: file, type(sales|diary)
+ * 영업일지 파일명 형식: sales_diary_YYYY_MM.xls (연도/월 자동 추출)
  */
 import { Writable } from "stream";
 import formidable from "formidable";
@@ -214,7 +215,6 @@ export default async function handler(req, res) {
 
     const { fields, file, buffer } = await parseForm(req);
     const type = fields.type; // "sales" or "diary"
-    const year = parseInt(fields.year, 10);
     const filename = file?.originalFilename || "unknown";
 
     // 확장자 검증
@@ -234,17 +234,19 @@ export default async function handler(req, res) {
       });
     }
 
-    if (type === "diary" && (isNaN(year) || year < 2000 || year > 2100)) {
-      return res.status(400).json({
-        success: false,
-        error: "영업일지는 연도(year)가 필요합니다. (2000~2100)",
-      });
-    }
-
     let result;
     if (type === "sales") {
       result = await processSalesCSV(buffer, filename);
     } else {
+      // 파일명에서 연도 추출: sales_diary_YYYY_MM 형식
+      const yearMatch = filename.match(/(\d{4})/);
+      const year = yearMatch ? parseInt(yearMatch[1], 10) : null;
+      if (!year || year < 2000 || year > 2100) {
+        return res.status(400).json({
+          success: false,
+          error: "파일명에 연도가 포함되어야 합니다. (예: sales_diary_2026_01.xls)",
+        });
+      }
       result = await processDiaryXLS(buffer, filename, year);
     }
 
