@@ -62,6 +62,5 @@
 - 거래처 = customer_name
 - 담당사원 = sales_rep
 - 제품군 = product_group
-- 규격 = product_spec
 - 공급가액/매출 = supply_amount
 - 마진율 = margin_rate_pct (소수점)

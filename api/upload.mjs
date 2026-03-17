@@ -33,9 +33,6 @@ const KOREAN_COLUMN_MAP = {
   "담당자": "sales_rep",
   "제품명": "product_name",
   "상품번호": "product_name",
-  "규격(재단)": "product_spec",
-  "규격(사이즈)": "product_spec",
-  "규격": "product_spec",
   "제품군": "product_group",
   "상품분류": "product_group",
   "수량": "qty",
@@ -164,7 +161,6 @@ async function processSalesCSV(buffer, filename) {
       customer_code: resolvedCode,
       sales_rep: row.sales_rep?.trim() || null,
       product_name: row.product_name?.trim() || null,
-      product_spec: row.product_spec?.trim() || null,
       product_group: row.product_group?.trim() || null,
       qty: parseNumber(row.qty),
       unit_price: parseNumber(row.unit_price),
@@ -172,14 +168,10 @@ async function processSalesCSV(buffer, filename) {
       margin_rate_pct: parsePercent(row.margin_rate_pct),
       vat: parseNumber(row.vat),
       total_amount: parseNumber(row.total_amount),
-      source_file: filename,
     });
   }
 
   const valid = transformed.filter((r) => r.sale_date && r.customer_name);
-
-  // 파일 단위 교체
-  await supabase.from("sales_clean").delete().eq("source_file", filename);
 
   const BATCH = 500;
   let inserted = 0;
@@ -228,7 +220,7 @@ async function processSalesXLSX(buffer, filename) {
         columnIndices[mapped] = i;
       } else {
         const lower = h.toLowerCase();
-        if (["sale_date", "customer_name", "sales_rep", "product_name", "product_spec",
+        if (["sale_date", "customer_name", "sales_rep", "product_name",
              "product_group", "qty", "unit_price", "supply_amount", "margin_rate_pct",
              "customer_code", "row_no"].includes(lower)) {
           columnIndices[lower] = i;
@@ -269,21 +261,16 @@ async function processSalesXLSX(buffer, filename) {
         customer_code: customerCode,
         sales_rep: get("sales_rep") ? String(get("sales_rep")).trim() : null,
         product_name: get("product_name") ? String(get("product_name")).trim() : null,
-        product_spec: get("product_spec") ? String(get("product_spec")).trim() : null,
         product_group: get("product_group") ? String(get("product_group")).trim() : null,
         qty: parseNumber(get("qty")),
         unit_price: parseNumber(get("unit_price")),
         supply_amount: parseNumber(get("supply_amount")),
         margin_rate_pct: parseNumber(get("margin_rate_pct")),
-        source_file: filename,
       });
     }
   }
 
   if (transformed.length === 0) throw new Error("유효한 데이터가 없습니다.");
-
-  // 파일 단위 교체
-  await supabase.from("sales_clean").delete().eq("source_file", filename);
 
   const BATCH = 500;
   let inserted = 0;

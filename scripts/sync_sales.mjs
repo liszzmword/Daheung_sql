@@ -26,9 +26,6 @@ const KOREAN_COLUMN_MAP = {
   "담당자": "sales_rep",
   "제품명": "product_name",
   "상품번호": "product_name",
-  "규격(재단)": "product_spec",
-  "규격(사이즈)": "product_spec",
-  "규격": "product_spec",
   "제품군": "product_group",
   "상품분류": "product_group",
   "수량": "qty",
@@ -131,7 +128,6 @@ async function processCSV(filePath, filename, lookupMap) {
       customer_code: customerCode,
       sales_rep: row.sales_rep?.trim() || null,
       product_name: row.product_name?.trim() || null,
-      product_spec: row.product_spec?.trim() || null,
       product_group: row.product_group?.trim() || null,
       qty: parseNumber(row.qty),
       unit_price: parseNumber(row.unit_price),
@@ -139,7 +135,6 @@ async function processCSV(filePath, filename, lookupMap) {
       margin_rate_pct: parsePercent(row.margin_rate_pct),
       vat: parseNumber(row.vat),
       total_amount: parseNumber(row.total_amount),
-      source_file: filename,
     };
   }).filter((r) => r.sale_date && r.customer_name);
 
@@ -171,7 +166,7 @@ async function processXLSX(filePath, filename, lookupMap) {
         columnIndices[mapped] = i;
       } else {
         const lower = h.toLowerCase();
-        if (["sale_date", "customer_name", "sales_rep", "product_name", "product_spec",
+        if (["sale_date", "customer_name", "sales_rep", "product_name",
              "product_group", "qty", "unit_price", "supply_amount", "margin_rate_pct",
              "customer_code", "row_no"].includes(lower)) {
           columnIndices[lower] = i;
@@ -210,13 +205,11 @@ async function processXLSX(filePath, filename, lookupMap) {
         customer_code: customerCode,
         sales_rep: get("sales_rep") ? String(get("sales_rep")).trim() : null,
         product_name: get("product_name") ? String(get("product_name")).trim() : null,
-        product_spec: get("product_spec") ? String(get("product_spec")).trim() : null,
         product_group: get("product_group") ? String(get("product_group")).trim() : null,
         qty: parseNumber(get("qty")),
         unit_price: parseNumber(get("unit_price")),
         supply_amount: parseNumber(get("supply_amount")),
         margin_rate_pct: parseNumber(get("margin_rate_pct")),
-        source_file: filename,
       });
     }
   }
@@ -255,14 +248,6 @@ async function main() {
   }
 
   console.log(`  ${transformed.length}건 유효 데이터`);
-
-  // 파일 단위 교체
-  console.log(`\n  기존 데이터 삭제 중 (source_file: ${filename})...`);
-  const { error: delError } = await supabase
-    .from("sales_clean")
-    .delete()
-    .eq("source_file", filename);
-  if (delError) throw new Error(`삭제 오류: ${delError.message}`);
 
   // Batch insert
   const BATCH = 500;
