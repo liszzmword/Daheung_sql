@@ -24,32 +24,27 @@ export const config = { api: { bodyParser: false } };
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_EXTENSIONS = [".csv", ".xls", ".xlsx"];
 
-/** 한글 → 영문 컬럼 매핑 */
+/** 한글 → 영문 컬럼 매핑 (표준 10컬럼 기준) */
 const KOREAN_COLUMN_MAP = {
-  "거래일자": "sale_date",
   "매출일": "sale_date",
+  "거래일자": "sale_date",
   "거래처": "customer_name",
-  "담당자": "sales_rep",
   "담당사원": "sales_rep",
-  "상품번호": "product_name",
+  "담당자": "sales_rep",
   "제품명": "product_name",
-  "규격(사이즈)": "product_spec",
+  "상품번호": "product_name",
   "규격(재단)": "product_spec",
+  "규격(사이즈)": "product_spec",
   "규격": "product_spec",
-  "상품분류": "product_group",
   "제품군": "product_group",
+  "상품분류": "product_group",
   "수량": "qty",
-  "단가(원)": "unit_price",
   "판매단가": "unit_price",
-  "금액/합계": "supply_amount",
+  "단가(원)": "unit_price",
   "공급가액": "supply_amount",
-  "할인율": "margin_rate_pct",
+  "금액/합계": "supply_amount",
   "마진율": "margin_rate_pct",
-  "할인금액": "vat",
-  "부가세": "vat",
-  "결제금액": "total_amount",
-  "합계": "total_amount",
-  "총금액": "total_amount",
+  "할인율": "margin_rate_pct",
 };
 
 /** 텍스트를 청크로 분할 */
@@ -205,81 +200,87 @@ async function processSalesCSV(buffer, filename) {
   return { rows_processed: records.length, rows_inserted: inserted, matched, unmatched, unmatched_names: unmatchedNames };
 }
 
-/** 세일즈 XLSX 처리 (한글 컬럼) */
+/** 세일즈 XLSX 처리 (한글 컬럼, 멀티시트 지원) */
 async function processSalesXLSX(buffer, filename) {
   const workbook = XLSX.read(buffer, { type: "buffer", cellDates: false });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
-
-  if (rows.length < 2) throw new Error("데이터가 없습니다.");
-
-  // 헤더 매핑
-  const headers = rows[0].map((h) => String(h || "").trim());
-  const columnIndices = {};
-
-  for (let i = 0; i < headers.length; i++) {
-    const h = headers[i];
-    const mapped = KOREAN_COLUMN_MAP[h];
-    if (mapped) {
-      columnIndices[mapped] = i;
-    } else {
-      // 영문 컬럼 직접 매핑 시도
-      const lower = h.toLowerCase();
-      if (["sale_date", "customer_name", "sales_rep", "product_name", "product_spec",
-           "product_group", "qty", "unit_price", "supply_amount", "margin_rate_pct",
-           "vat", "total_amount", "customer_code", "row_no"].includes(lower)) {
-        columnIndices[lower] = i;
-      }
-    }
-  }
-
-  if (columnIndices.sale_date == null || columnIndices.customer_name == null) {
-    throw new Error(`필수 컬럼(거래일자/매출일, 거래처)을 찾을 수 없습니다. 헤더: ${headers.join(", ")}`);
-  }
 
   // 거래처 코드 룩업맵
   const lookupMap = await buildCustomerLookupMap();
 
   const transformed = [];
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row || row.every((c) => c == null || c === "")) continue;
+  let totalRows = 0;
 
-    const get = (key) => (columnIndices[key] != null ? row[columnIndices[key]] : null);
+  // 모든 시트 순회
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
 
-    const customerName = get("customer_name");
-    if (!customerName) continue;
+    if (rows.length < 2) continue;
 
-    const nameStr = String(customerName).trim();
-    const saleDate = parseDate(get("sale_date"));
-    if (!saleDate) continue;
+    // 헤더 매핑
+    const headers = rows[0].map((h) => String(h || "").trim());
+    const columnIndices = {};
 
-    // 거래처 코드 매칭
-    const codeFromFile = get("customer_code");
-    let customerCode = codeFromFile ? String(codeFromFile).trim() : null;
-    if (!customerCode && lookupMap.size > 0) {
-      const match = lookupCustomerCode(nameStr, lookupMap);
-      customerCode = match.customer_code;
+    for (let i = 0; i < headers.length; i++) {
+      const h = headers[i];
+      const mapped = KOREAN_COLUMN_MAP[h];
+      if (mapped) {
+        columnIndices[mapped] = i;
+      } else {
+        const lower = h.toLowerCase();
+        if (["sale_date", "customer_name", "sales_rep", "product_name", "product_spec",
+             "product_group", "qty", "unit_price", "supply_amount", "margin_rate_pct",
+             "customer_code", "row_no"].includes(lower)) {
+          columnIndices[lower] = i;
+        }
+      }
     }
 
-    transformed.push({
-      row_no: i,
-      sale_date: saleDate,
-      customer_name: nameStr,
-      customer_code: customerCode,
-      sales_rep: get("sales_rep") ? String(get("sales_rep")).trim() : null,
-      product_name: get("product_name") ? String(get("product_name")).trim() : null,
-      product_spec: get("product_spec") ? String(get("product_spec")).trim() : null,
-      product_group: get("product_group") ? String(get("product_group")).trim() : null,
-      qty: parseNumber(get("qty")),
-      unit_price: parseNumber(get("unit_price")),
-      supply_amount: parseNumber(get("supply_amount")),
-      margin_rate_pct: parsePercent(get("margin_rate_pct")),
-      vat: parseNumber(get("vat")),
-      total_amount: parseNumber(get("total_amount")),
-      source_file: filename,
-    });
+    // 필수 컬럼 없으면 이 시트 건너뜀
+    if (columnIndices.sale_date == null || columnIndices.customer_name == null) continue;
+
+    totalRows += rows.length - 1;
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.every((c) => c == null || c === "")) continue;
+
+      const get = (key) => (columnIndices[key] != null ? row[columnIndices[key]] : null);
+
+      const customerName = get("customer_name");
+      if (!customerName) continue;
+
+      const nameStr = String(customerName).trim();
+      const saleDate = parseDate(get("sale_date"));
+      if (!saleDate) continue;
+
+      // 거래처 코드 매칭
+      const codeFromFile = get("customer_code");
+      let customerCode = codeFromFile ? String(codeFromFile).trim() : null;
+      if (!customerCode && lookupMap.size > 0) {
+        const match = lookupCustomerCode(nameStr, lookupMap);
+        customerCode = match.customer_code;
+      }
+
+      transformed.push({
+        row_no: transformed.length + 1,
+        sale_date: saleDate,
+        customer_name: nameStr,
+        customer_code: customerCode,
+        sales_rep: get("sales_rep") ? String(get("sales_rep")).trim() : null,
+        product_name: get("product_name") ? String(get("product_name")).trim() : null,
+        product_spec: get("product_spec") ? String(get("product_spec")).trim() : null,
+        product_group: get("product_group") ? String(get("product_group")).trim() : null,
+        qty: parseNumber(get("qty")),
+        unit_price: parseNumber(get("unit_price")),
+        supply_amount: parseNumber(get("supply_amount")),
+        margin_rate_pct: parseNumber(get("margin_rate_pct")),
+        source_file: filename,
+      });
+    }
   }
+
+  if (transformed.length === 0) throw new Error("유효한 데이터가 없습니다.");
 
   // 파일 단위 교체
   await supabase.from("sales_clean").delete().eq("source_file", filename);
@@ -293,14 +294,14 @@ async function processSalesXLSX(buffer, filename) {
     inserted += batch.length;
   }
 
-  await logSync("sales_xlsx", filename, rows.length - 1, inserted);
+  await logSync("sales_xlsx", filename, totalRows, inserted);
 
   // 매칭 통계
   const matched = transformed.filter((r) => r.customer_code).length;
   const unmatched = transformed.filter((r) => !r.customer_code).length;
   const unmatchedNames = [...new Set(transformed.filter((r) => !r.customer_code).map((r) => r.customer_name))];
 
-  return { rows_processed: rows.length - 1, rows_inserted: inserted, matched, unmatched, unmatched_names: unmatchedNames };
+  return { rows_processed: totalRows, rows_inserted: inserted, matched, unmatched, unmatched_names: unmatchedNames };
 }
 
 /** 거래처 마스터 XLS 처리 */
