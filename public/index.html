@@ -404,8 +404,7 @@
             <h3>데이터 업로드</h3>
             <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
                 <div>파일을 드래그하거나 클릭하여 선택</div>
-                <p>.csv (세일즈) / .xls, .xlsx (영업일지)</p>
-                <p style="font-size:11px;margin-top:2px">영업일지 파일명 예: sales_diary_2026_01.xls</p>
+                <p>.csv/.xlsx (세일즈) / .xls (영업일지/거래처)</p>
                 <div class="filename" id="uploadFilename"></div>
             </div>
             <input type="file" id="fileInput" accept=".csv,.xls,.xlsx" style="display:none" onchange="handleFileSelect(this)">
@@ -413,8 +412,9 @@
                 <div style="flex:1">
                     <label>유형</label><br>
                     <select id="uploadType" style="width:100%">
-                        <option value="sales">세일즈 CSV</option>
-                        <option value="diary">영업일지 XLS</option>
+                        <option value="sales">세일즈 (CSV/XLSX)</option>
+                        <option value="diary">영업일지 (XLS)</option>
+                        <option value="customers">거래처 마스터 (XLS)</option>
                     </select>
                 </div>
             </div>
@@ -796,11 +796,16 @@
 
             // 자동 유형 감지
             const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0];
+            const fname = file.name.toLowerCase();
             const typeSelect = document.getElementById('uploadType');
-            if (ext === '.csv') {
+            if (fname.includes('거래처') || fname.includes('customer')) {
+                typeSelect.value = 'customers';
+            } else if (fname.includes('diary') || fname.includes('일지')) {
+                typeSelect.value = 'diary';
+            } else if (ext === '.csv') {
                 typeSelect.value = 'sales';
             } else {
-                typeSelect.value = 'diary';
+                typeSelect.value = 'sales';
             }
         }
 
@@ -829,9 +834,23 @@
 
                 if (data.success) {
                     resultEl.className = 'upload-result success';
-                    let msg = `${data.rows_inserted}건 처리 완료`;
-                    if (data.sales_reps) msg += ` (${data.sales_reps.join(', ')})`;
-                    resultEl.textContent = msg;
+                    let html = `<div style="font-weight:600;margin-bottom:8px">업로드 완료</div>`;
+                    html += `<div>파일: ${escapeHtml(uploadFile.name)}</div>`;
+                    html += `<div>처리: ${data.rows_inserted}건</div>`;
+                    if (data.sales_reps) html += `<div>영업사원: ${data.sales_reps.map(escapeHtml).join(', ')}</div>`;
+                    if (data.matched != null) {
+                        const total = (data.matched || 0) + (data.unmatched || 0);
+                        const pct = total > 0 ? ((data.matched / total) * 100).toFixed(1) : 0;
+                        html += `<div>거래처 매칭: ${data.matched}건 (${pct}%)</div>`;
+                        if (data.unmatched > 0) {
+                            html += `<div style="color:#b91c1c">미매칭: ${data.unmatched}건</div>`;
+                            if (data.unmatched_names && data.unmatched_names.length > 0) {
+                                html += `<div style="font-size:11px;color:#666;margin-top:4px">미매칭 거래처: ${data.unmatched_names.map(escapeHtml).join(', ')}</div>`;
+                            }
+                        }
+                    }
+                    html += `<button onclick="closeUploadModal()" style="margin-top:12px;padding:8px 24px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;font-family:inherit;font-size:13px">확인</button>`;
+                    resultEl.innerHTML = html;
                     loadDataStatus();
                 } else {
                     resultEl.className = 'upload-result error';

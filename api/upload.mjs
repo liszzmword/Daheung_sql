@@ -1,22 +1,55 @@
 /**
- * 파일 업로드 API (세일즈 CSV / 영업일지 XLS)
+ * 파일 업로드 API (세일즈 CSV/XLSX / 영업일지 XLS / 거래처 마스터 XLS)
  * POST /api/upload
- * multipart/form-data: file, type(sales|diary)
- * 영업일지 파일명 형식: sales_diary_YYYY_MM.xls (연도/월 자동 추출)
+ * multipart/form-data: file, type(sales|diary|customers)
  */
 import { Writable } from "stream";
 import formidable from "formidable";
+import * as XLSX from "xlsx";
 import { parse } from "csv-parse/sync";
 import { validateEnv, supabase } from "../lib/clients.mjs";
 import { embedTexts } from "../lib/embedding.mjs";
-import { parseDiaryXLS, composeDiaryText } from "../lib/diary.mjs";
+import { parseDiaryXLS, composeDiaryText, excelSerialToDate } from "../lib/diary.mjs";
 import { verifyAuth, setCorsHeaders, sendUnauthorized } from "../lib/auth.mjs";
+import {
+  parseCustomerXLS,
+  upsertCustomers,
+  buildCustomerLookupMap,
+  lookupCustomerCode,
+} from "../lib/customers.mjs";
 
 /** Vercel에서 body parsing 비활성화 */
 export const config = { api: { bodyParser: false } };
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_EXTENSIONS = [".csv", ".xls", ".xlsx"];
+
+/** 한글 → 영문 컬럼 매핑 */
+const KOREAN_COLUMN_MAP = {
+  "거래일자": "sale_date",
+  "매출일": "sale_date",
+  "거래처": "customer_name",
+  "담당자": "sales_rep",
+  "담당사원": "sales_rep",
+  "상품번호": "product_name",
+  "제품명": "product_name",
+  "규격(사이즈)": "product_spec",
+  "규격(재단)": "product_spec",
+  "규격": "product_spec",
+  "상품분류": "product_group",
+  "제품군": "product_group",
+  "수량": "qty",
+  "단가(원)": "unit_price",
+  "판매단가": "unit_price",
+  "금액/합계": "supply_amount",
+  "공급가액": "supply_amount",
+  "할인율": "margin_rate_pct",
+  "마진율": "margin_rate_pct",
+  "할인금액": "vat",
+  "부가세": "vat",
+  "결제금액": "total_amount",
+  "합계": "total_amount",
+};
 
 /** 텍스트를 청크로 분할 */
 function chunkText(text, chunkSize = 1000, overlap = 150) {
@@ -49,16 +82,45 @@ function parsePercent(val) {
   return isNaN(num) ? null : num;
 }
 
-/** 날짜 변환 */
+/** 날짜 변환 (다양한 형식 지원) */
 function parseDate(val) {
-  if (!val) return null;
+  if (val == null || val === "") return null;
+
+  // Excel serial number
+  if (typeof val === "number" && val > 40000) {
+    const d = excelSerialToDate(val);
+    if (d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
+  }
+
+  // Date 객체
+  if (val instanceof Date) {
+    const y = val.getFullYear();
+    const m = String(val.getMonth() + 1).padStart(2, "0");
+    const day = String(val.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
   const str = String(val).trim();
+
+  // YYYY.M.D 형식
   const dotMatch = str.match(/^(\d{4})\.(\d{1,2})\.(\d{1,2})$/);
   if (dotMatch) {
     const [, y, m, d] = dotMatch;
     return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
   }
+
+  // YYYY-MM-DD 형식
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+
+  // YYYY-MM-DD... (날짜 뒤에 시간 등 붙은 경우)
+  const isoMatch = str.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (isoMatch) return isoMatch[1];
+
   return str;
 }
 
@@ -74,7 +136,7 @@ async function logSync(syncType, filename, rowsProcessed, rowsInserted, status =
   });
 }
 
-/** 세일즈 CSV 처리 */
+/** 세일즈 CSV 처리 (기존 영문 컬럼) */
 async function processSalesCSV(buffer, filename) {
   const csvContent = buffer.toString("utf8");
   const records = parse(csvContent, {
@@ -84,14 +146,29 @@ async function processSalesCSV(buffer, filename) {
     trim: true,
   });
 
-  const transformed = records
-    .map((row) => ({
-      row_no: parseNumber(row.row_no),
+  // 거래처 코드 룩업맵 (customer_code가 없는 행에 대해)
+  let lookupMap = null;
+
+  const transformed = [];
+  for (let idx = 0; idx < records.length; idx++) {
+    const row = records[idx];
+    const customerCode = row.customer_code?.trim() || null;
+
+    let resolvedCode = customerCode;
+    if (!resolvedCode && row.customer_name) {
+      if (!lookupMap) lookupMap = await buildCustomerLookupMap();
+      const match = lookupCustomerCode(row.customer_name.trim(), lookupMap);
+      resolvedCode = match.customer_code;
+    }
+
+    transformed.push({
+      row_no: parseNumber(row.row_no) || idx + 1,
       sale_date: parseDate(row.sale_date),
       customer_name: row.customer_name?.trim() || null,
-      customer_code: row.customer_code?.trim() || null,
+      customer_code: resolvedCode,
       sales_rep: row.sales_rep?.trim() || null,
       product_name: row.product_name?.trim() || null,
+      product_spec: row.product_spec?.trim() || null,
       product_group: row.product_group?.trim() || null,
       qty: parseNumber(row.qty),
       unit_price: parseNumber(row.unit_price),
@@ -100,10 +177,110 @@ async function processSalesCSV(buffer, filename) {
       vat: parseNumber(row.vat),
       total_amount: parseNumber(row.total_amount),
       source_file: filename,
-    }))
-    .filter((r) => r.sale_date && r.customer_name);
+    });
+  }
 
-  // 파일 단위 교체: 같은 파일명의 기존 데이터만 삭제
+  const valid = transformed.filter((r) => r.sale_date && r.customer_name);
+
+  // 파일 단위 교체
+  await supabase.from("sales_clean").delete().eq("source_file", filename);
+
+  const BATCH = 500;
+  let inserted = 0;
+  for (let i = 0; i < valid.length; i += BATCH) {
+    const batch = valid.slice(i, i + BATCH);
+    const { error } = await supabase.from("sales_clean").insert(batch);
+    if (error) throw new Error(`Insert 오류: ${error.message}`);
+    inserted += batch.length;
+  }
+
+  await logSync("sales_csv", filename, records.length, inserted);
+
+  // 매칭 통계
+  const matched = valid.filter((r) => r.customer_code).length;
+  const unmatched = valid.filter((r) => !r.customer_code).length;
+  const unmatchedNames = [...new Set(valid.filter((r) => !r.customer_code).map((r) => r.customer_name))];
+
+  return { rows_processed: records.length, rows_inserted: inserted, matched, unmatched, unmatched_names: unmatchedNames };
+}
+
+/** 세일즈 XLSX 처리 (한글 컬럼) */
+async function processSalesXLSX(buffer, filename) {
+  const workbook = XLSX.read(buffer, { type: "buffer", cellDates: false });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
+
+  if (rows.length < 2) throw new Error("데이터가 없습니다.");
+
+  // 헤더 매핑
+  const headers = rows[0].map((h) => String(h || "").trim());
+  const columnIndices = {};
+
+  for (let i = 0; i < headers.length; i++) {
+    const h = headers[i];
+    const mapped = KOREAN_COLUMN_MAP[h];
+    if (mapped) {
+      columnIndices[mapped] = i;
+    } else {
+      // 영문 컬럼 직접 매핑 시도
+      const lower = h.toLowerCase();
+      if (["sale_date", "customer_name", "sales_rep", "product_name", "product_spec",
+           "product_group", "qty", "unit_price", "supply_amount", "margin_rate_pct",
+           "vat", "total_amount", "customer_code", "row_no"].includes(lower)) {
+        columnIndices[lower] = i;
+      }
+    }
+  }
+
+  if (columnIndices.sale_date == null || columnIndices.customer_name == null) {
+    throw new Error(`필수 컬럼(거래일자/매출일, 거래처)을 찾을 수 없습니다. 헤더: ${headers.join(", ")}`);
+  }
+
+  // 거래처 코드 룩업맵
+  const lookupMap = await buildCustomerLookupMap();
+
+  const transformed = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.every((c) => c == null || c === "")) continue;
+
+    const get = (key) => (columnIndices[key] != null ? row[columnIndices[key]] : null);
+
+    const customerName = get("customer_name");
+    if (!customerName) continue;
+
+    const nameStr = String(customerName).trim();
+    const saleDate = parseDate(get("sale_date"));
+    if (!saleDate) continue;
+
+    // 거래처 코드 매칭
+    const codeFromFile = get("customer_code");
+    let customerCode = codeFromFile ? String(codeFromFile).trim() : null;
+    if (!customerCode && lookupMap.size > 0) {
+      const match = lookupCustomerCode(nameStr, lookupMap);
+      customerCode = match.customer_code;
+    }
+
+    transformed.push({
+      row_no: i,
+      sale_date: saleDate,
+      customer_name: nameStr,
+      customer_code: customerCode,
+      sales_rep: get("sales_rep") ? String(get("sales_rep")).trim() : null,
+      product_name: get("product_name") ? String(get("product_name")).trim() : null,
+      product_spec: get("product_spec") ? String(get("product_spec")).trim() : null,
+      product_group: get("product_group") ? String(get("product_group")).trim() : null,
+      qty: parseNumber(get("qty")),
+      unit_price: parseNumber(get("unit_price")),
+      supply_amount: parseNumber(get("supply_amount")),
+      margin_rate_pct: parsePercent(get("margin_rate_pct")),
+      vat: parseNumber(get("vat")),
+      total_amount: parseNumber(get("total_amount")),
+      source_file: filename,
+    });
+  }
+
+  // 파일 단위 교체
   await supabase.from("sales_clean").delete().eq("source_file", filename);
 
   const BATCH = 500;
@@ -115,8 +292,28 @@ async function processSalesCSV(buffer, filename) {
     inserted += batch.length;
   }
 
-  await logSync("sales_csv", filename, records.length, inserted);
-  return { rows_processed: records.length, rows_inserted: inserted };
+  await logSync("sales_xlsx", filename, rows.length - 1, inserted);
+
+  // 매칭 통계
+  const matched = transformed.filter((r) => r.customer_code).length;
+  const unmatched = transformed.filter((r) => !r.customer_code).length;
+  const unmatchedNames = [...new Set(transformed.filter((r) => !r.customer_code).map((r) => r.customer_name))];
+
+  return { rows_processed: rows.length - 1, rows_inserted: inserted, matched, unmatched, unmatched_names: unmatchedNames };
+}
+
+/** 거래처 마스터 XLS 처리 */
+async function processCustomerXLS(buffer, filename) {
+  const customers = parseCustomerXLS(buffer);
+  if (customers.length === 0) {
+    await logSync("customers", filename, 0, 0, "success", "데이터 없음");
+    return { rows_processed: 0, rows_inserted: 0 };
+  }
+
+  const upserted = await upsertCustomers(customers);
+  await logSync("customers", filename, customers.length, upserted);
+
+  return { rows_processed: customers.length, rows_inserted: upserted };
 }
 
 /** 영업일지 XLS 처리 */
@@ -128,14 +325,24 @@ async function processDiaryXLS(buffer, filename, year) {
     return { rows_processed: 0, rows_inserted: 0, sales_reps: sheetNames };
   }
 
+  // 거래처 코드 매칭
+  const lookupMap = await buildCustomerLookupMap();
+  const entriesWithCode = entries.map((e) => {
+    if (lookupMap.size > 0) {
+      const match = lookupCustomerCode(e.company_name, lookupMap);
+      return { ...e, customer_code: match.customer_code };
+    }
+    return { ...e, customer_code: null };
+  });
+
   // 기존 데이터 삭제
   await supabase.from("sales_diary").delete().eq("source_file", filename);
 
   // Insert
   const BATCH = 500;
   let inserted = 0;
-  for (let i = 0; i < entries.length; i += BATCH) {
-    const batch = entries.slice(i, i + BATCH).map((e) => ({ ...e, source_file: filename }));
+  for (let i = 0; i < entriesWithCode.length; i += BATCH) {
+    const batch = entriesWithCode.slice(i, i + BATCH).map((e) => ({ ...e, source_file: filename }));
     const { error } = await supabase.from("sales_diary").insert(batch);
     if (error) throw new Error(`Insert 오류: ${error.message}`);
     inserted += batch.length;
@@ -164,7 +371,12 @@ async function processDiaryXLS(buffer, filename, year) {
   }
 
   await logSync("diary_xls", filename, entries.length, inserted);
-  return { rows_processed: entries.length, rows_inserted: inserted, sales_reps: sheetNames };
+
+  // 매칭 통계
+  const matched = entriesWithCode.filter((e) => e.customer_code).length;
+  const unmatched = entriesWithCode.filter((e) => !e.customer_code).length;
+
+  return { rows_processed: entries.length, rows_inserted: inserted, sales_reps: sheetNames, matched, unmatched };
 }
 
 /** formidable로 파일 파싱 (Vercel 호환) */
@@ -214,7 +426,7 @@ export default async function handler(req, res) {
     validateEnv();
 
     const { fields, file, buffer } = await parseForm(req);
-    const type = fields.type; // "sales" or "diary"
+    const type = fields.type; // "sales", "diary", or "customers"
     const filename = file?.originalFilename || "unknown";
 
     // 확장자 검증
@@ -227,18 +439,25 @@ export default async function handler(req, res) {
     }
 
     // 타입 검증
-    if (!type || !["sales", "diary"].includes(type)) {
+    if (!type || !["sales", "diary", "customers"].includes(type)) {
       return res.status(400).json({
         success: false,
-        error: 'type은 "sales" 또는 "diary"이어야 합니다.',
+        error: 'type은 "sales", "diary", 또는 "customers"이어야 합니다.',
       });
     }
 
     let result;
-    if (type === "sales") {
-      result = await processSalesCSV(buffer, filename);
+
+    if (type === "customers") {
+      result = await processCustomerXLS(buffer, filename);
+    } else if (type === "sales") {
+      if (ext === ".csv") {
+        result = await processSalesCSV(buffer, filename);
+      } else {
+        result = await processSalesXLSX(buffer, filename);
+      }
     } else {
-      // 파일명에서 연도 추출: sales_diary_YYYY_MM 형식
+      // diary
       const yearMatch = filename.match(/(\d{4})/);
       const year = yearMatch ? parseInt(yearMatch[1], 10) : null;
       if (!year || year < 2000 || year > 2100) {
