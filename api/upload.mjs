@@ -49,6 +49,7 @@ const KOREAN_COLUMN_MAP = {
   "부가세": "vat",
   "결제금액": "total_amount",
   "합계": "total_amount",
+  "총금액": "total_amount",
 };
 
 /** 텍스트를 청크로 분할 */
