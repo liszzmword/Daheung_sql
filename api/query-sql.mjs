@@ -1,0 +1,63 @@
+import { validateEnv } from "../lib/clients.mjs";
+import { embedQuery } from "../lib/embedding.mjs";
+import { searchRelevantDocs, buildContext } from "../lib/rag.mjs";
+import { generateAndExecuteSQL, generateSQLAnswer } from "../lib/sql.mjs";
+import { logQuery } from "../lib/logger.mjs";
+import { verifyAuth, setCorsHeaders, sendUnauthorized } from "../lib/auth.mjs";
+
+/** Text-to-SQL 데이터 조회 API */
+export default async function handler(req, res) {
+  setCorsHeaders(res);
+
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (!verifyAuth(req)) return sendUnauthorized(res);
+
+  try {
+    validateEnv();
+
+    const { question, history = [] } = req.body;
+    if (!question || typeof question !== "string" || question.trim() === "") {
+      return res.status(400).json({ error: "질문을 입력해주세요." });
+    }
+
+    const q = question.trim();
+    // history 안전성: 배열이고 최대 10턴만 허용
+    const safeHistory = Array.isArray(history) ? history.slice(-10) : [];
+
+    // 1. RAG 검색으로 비즈니스 규칙 가져오기
+    const embedding = await embedQuery(q);
+    const docs = await searchRelevantDocs(embedding);
+    const ragContext = buildContext(docs) || "기본 스키마 사용";
+
+    // 2. SQL 생성 + 실행 (실패 시 1회 재시도, 대화 이력 전달)
+    const { sql, result } = await generateAndExecuteSQL(q, ragContext, 1, safeHistory);
+
+    if (!result.success) {
+      logQuery({ mode: "sql", question: q, sql_generated: sql, success: false, error_message: result.error });
+      return res.status(200).json({
+        success: false,
+        question: q,
+        sql,
+        error: result.error,
+      });
+    }
+
+    // 3. 자연어 답변 생성
+    const answer = await generateSQLAnswer(q, sql, result);
+
+    logQuery({ mode: "sql", question: q, answer, sql_generated: sql, data: result.data, success: true });
+
+    return res.status(200).json({
+      success: true,
+      question: q,
+      sql,
+      data: result.data,
+      answer,
+    });
+  } catch (error) {
+    console.error("API 오류:", error);
+    logQuery({ mode: "sql", question: req.body?.question, success: false, error_message: error.message });
+    return res.status(500).json({ success: false, error: "서버 오류가 발생했습니다.", message: error.message });
+  }
+}

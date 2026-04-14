@@ -1,0 +1,5 @@
+node_modules/
+.env
+.vercel
+desktop.ini
+package.json.broken
