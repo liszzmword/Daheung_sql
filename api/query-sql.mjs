@@ -2,6 +2,7 @@ import { validateEnv } from "../lib/clients.mjs";
 import { embedQuery } from "../lib/embedding.mjs";
 import { searchRelevantDocs, buildContext } from "../lib/rag.mjs";
 import { generateAndExecuteSQL, streamSQLAnswer } from "../lib/sql.mjs";
+import { fetchAliases, expandAliases } from "../lib/aliases.mjs";
 import { logQuery } from "../lib/logger.mjs";
 import { verifyAuth, setCorsHeaders, sendUnauthorized } from "../lib/auth.mjs";
 
@@ -25,8 +26,12 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "질문을 입력해주세요." });
     }
 
-    const q = question.trim();
+    const rawQ = question.trim();
     const safeHistory = Array.isArray(history) ? history.slice(-10) : [];
+
+    // 별칭 치환 (예: "3H 매출" → "주식회사 쓰리에이치 매출")
+    const aliases = await fetchAliases();
+    const q = expandAliases(rawQ, aliases);
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache, no-transform");
@@ -41,18 +46,18 @@ export default async function handler(req, res) {
     const { sql, result } = await generateAndExecuteSQL(q, ragContext, 1, safeHistory);
 
     if (!result.success) {
-      sendSSE(res, "error", { success: false, question: q, sql, error: result.error });
+      sendSSE(res, "error", { success: false, question: rawQ, sql, error: result.error });
       res.end();
-      logQuery({ mode: "sql", question: q, sql_generated: sql, success: false, error_message: result.error });
+      logQuery({ mode: "sql", question: rawQ, sql_generated: sql, success: false, error_message: result.error });
       return;
     }
 
     // 3. SQL + 데이터를 즉시 전송 (테이블이 답변보다 먼저 보임)
-    sendSSE(res, "meta", { success: true, question: q, sql, data: result.data });
+    sendSSE(res, "meta", { success: true, question: rawQ, sql, data: result.data });
 
-    // 4. 자연어 답변 스트리밍
+    // 4. 자연어 답변 스트리밍 (별칭 치환된 q가 아니라 사용자 원문 기준 답변이 자연스러움)
     let fullAnswer = "";
-    for await (const chunk of streamSQLAnswer(q, sql, result)) {
+    for await (const chunk of streamSQLAnswer(rawQ, sql, result)) {
       fullAnswer += chunk;
       sendSSE(res, "delta", { text: chunk });
     }
@@ -60,7 +65,7 @@ export default async function handler(req, res) {
     sendSSE(res, "done", { answer: fullAnswer });
     res.end();
 
-    logQuery({ mode: "sql", question: q, answer: fullAnswer, sql_generated: sql, data: result.data, success: true });
+    logQuery({ mode: "sql", question: rawQ, answer: fullAnswer, sql_generated: sql, data: result.data, success: true });
   } catch (error) {
     console.error("API 오류:", error);
     if (res.headersSent) {

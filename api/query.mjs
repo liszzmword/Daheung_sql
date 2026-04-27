@@ -1,6 +1,7 @@
 import { validateEnv } from "../lib/clients.mjs";
 import { embedQuery } from "../lib/embedding.mjs";
 import { searchRelevantDocs, buildContext, streamRAGAnswer } from "../lib/rag.mjs";
+import { fetchAliases, expandAliases } from "../lib/aliases.mjs";
 import { logQuery } from "../lib/logger.mjs";
 import { verifyAuth, setCorsHeaders, sendUnauthorized } from "../lib/auth.mjs";
 
@@ -24,18 +25,22 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "질문을 입력해주세요." });
     }
 
-    const q = question.trim();
+    const rawQ = question.trim();
     const safeHistory = Array.isArray(history) ? history.slice(-10) : [];
+
+    // 별칭 치환
+    const aliases = await fetchAliases();
+    const q = expandAliases(rawQ, aliases);
 
     const embedding = await embedQuery(q);
     const docs = await searchRelevantDocs(embedding, { count: 5 });
 
     if (!docs || docs.length === 0) {
       const noDocAnswer = "관련 문서를 찾을 수 없습니다.";
-      logQuery({ mode: "rag", question: q, answer: noDocAnswer, success: true });
+      logQuery({ mode: "rag", question: rawQ, answer: noDocAnswer, success: true });
       return res.status(200).json({
         success: true,
-        question: q,
+        question: rawQ,
         answer: noDocAnswer,
         sources: [],
       });
@@ -48,10 +53,10 @@ export default async function handler(req, res) {
     res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
 
-    sendSSE(res, "meta", { success: true, question: q, sources });
+    sendSSE(res, "meta", { success: true, question: rawQ, sources });
 
     let fullAnswer = "";
-    for await (const chunk of streamRAGAnswer(q, context, safeHistory)) {
+    for await (const chunk of streamRAGAnswer(rawQ, context, safeHistory)) {
       fullAnswer += chunk;
       sendSSE(res, "delta", { text: chunk });
     }
@@ -59,7 +64,7 @@ export default async function handler(req, res) {
     sendSSE(res, "done", { answer: fullAnswer });
     res.end();
 
-    logQuery({ mode: "rag", question: q, answer: fullAnswer, sources, success: true });
+    logQuery({ mode: "rag", question: rawQ, answer: fullAnswer, sources, success: true });
   } catch (error) {
     console.error("API 오류:", error);
     if (res.headersSent) {
