@@ -330,140 +330,6 @@
         .upload-summary.success { background: #dcfce7; color: #166534; }
         .upload-summary.error { background: #fee2e2; color: #991b1b; }
 
-        /* 거래처 관리 모달 */
-        .customers-modal {
-            max-width: 720px !important;
-            max-height: 85vh;
-            display: flex;
-            flex-direction: column;
-        }
-        .customers-search {
-            margin-bottom: 12px;
-            position: relative;
-        }
-        .customers-search input {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            font-size: 13px;
-            font-family: inherit;
-            background: var(--surface);
-            color: var(--text);
-        }
-        .customers-search input:focus {
-            outline: none;
-            border-color: var(--accent);
-        }
-        .customers-list {
-            flex: 1;
-            overflow-y: auto;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            min-height: 200px;
-            max-height: 55vh;
-        }
-        .customers-list-empty {
-            padding: 40px 20px;
-            text-align: center;
-            color: var(--text-sub);
-            font-size: 13px;
-        }
-        .customer-row {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 14px;
-            border-bottom: 1px solid var(--border);
-        }
-        .customer-row:last-child { border-bottom: none; }
-        .customer-row:hover { background: var(--accent-light); }
-        .customer-info {
-            flex: 0 0 220px;
-            min-width: 0;
-        }
-        .customer-name {
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--text);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .customer-meta {
-            font-size: 11px;
-            color: var(--text-sub);
-            margin-top: 2px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .customer-aliases {
-            flex: 1;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
-            align-items: center;
-            min-width: 0;
-        }
-        .alias-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 2px;
-            padding: 3px 4px 3px 8px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            font-size: 12px;
-            color: var(--text);
-            transition: all 0.15s;
-        }
-        .alias-chip.removing { opacity: 0.4; }
-        .alias-chip-remove {
-            background: none;
-            border: none;
-            color: var(--text-sub);
-            cursor: pointer;
-            padding: 0 4px;
-            font-size: 14px;
-            line-height: 1;
-            border-radius: 2px;
-        }
-        .alias-chip-remove:hover { color: #dc2626; background: #fee2e2; }
-        .alias-add-input {
-            flex: 1;
-            min-width: 120px;
-            padding: 4px 8px;
-            border: 1px dashed var(--border);
-            border-radius: 4px;
-            font-size: 12px;
-            background: transparent;
-            color: var(--text);
-            font-family: inherit;
-        }
-        .alias-add-input:focus {
-            outline: none;
-            border-color: var(--accent);
-            border-style: solid;
-            background: var(--surface);
-        }
-        .alias-add-input:disabled { opacity: 0.5; }
-        .alias-error-text {
-            font-size: 11px;
-            color: #dc2626;
-            width: 100%;
-            margin-top: 2px;
-        }
-        .customers-help {
-            margin-top: 12px;
-            padding: 10px 14px;
-            background: var(--accent-light);
-            border-radius: 6px;
-            font-size: 11px;
-            color: var(--text-sub);
-            line-height: 1.5;
-        }
-
         /* 모바일 */
         @media (max-width: 640px) {
             .header { padding: 12px 16px; }
@@ -508,7 +374,6 @@
                     <button id="sqlMode" onclick="switchMode('sql')">데이터</button>
                 </div>
                 <button class="header-btn" onclick="openUploadModal()">업로드</button>
-                <button class="header-btn" onclick="openCustomersModal()">거래처</button>
                 <button class="header-btn" id="historyBtn" onclick="toggleHistory()">기록</button>
                 <button class="header-btn" onclick="handleLogout()">로그아웃</button>
             </div>
@@ -584,24 +449,6 @@
                 </div>
             </div>
             <div id="uploadSummary" class="upload-summary"></div>
-        </div>
-    </div>
-
-    <!-- 거래처 관리 모달 -->
-    <div class="modal-overlay" id="customersModal">
-        <div class="modal customers-modal">
-            <button class="modal-close" onclick="closeCustomersModal()">&times;</button>
-            <h3>거래처 관리</h3>
-            <div class="customers-search">
-                <input type="text" id="customersSearch" placeholder="거래처명 검색 (예: 쓰리에이치)" autocomplete="off">
-            </div>
-            <div class="customers-list" id="customersList">
-                <div class="customers-list-empty">거래처를 불러오는 중...</div>
-            </div>
-            <div class="customers-help">
-                별칭은 검색 시 동의어로 사용됩니다. 예: "주식회사 쓰리에이치"의 별칭으로 <b>3H</b>를 등록하면 "3H 매출"로 검색해도 매칭됩니다.<br>
-                여러 별칭은 콤마(,)로 구분하세요. 저장 시 자동으로 소문자/공백 제거 정규화됩니다.
-            </div>
         </div>
     </div>
 
@@ -875,109 +722,6 @@
             if (el) el.remove();
         }
 
-        function addStreamingMessage(meta) {
-            const msg = document.createElement('div');
-            msg.className = 'message bot';
-            msg.id = 'streamingMessage';
-
-            const bubble = document.createElement('div');
-            bubble.className = 'bubble';
-
-            const textDiv = document.createElement('div');
-            textDiv.className = 'answer-text';
-            textDiv.id = 'streamingAnswerText';
-            bubble.appendChild(textDiv);
-
-            const hasTable = meta && meta.data && Array.isArray(meta.data) && meta.data.length > 0;
-            if (hasTable) {
-                const tableWrap = document.createElement('div');
-                tableWrap.className = 'answer-table-wrap';
-                tableWrap.innerHTML = buildTableHTML(meta.data);
-                bubble.appendChild(tableWrap);
-            }
-
-            msg.appendChild(bubble);
-
-            if (meta) {
-                const metaDiv = document.createElement('div');
-                metaDiv.className = 'meta';
-
-                if (meta.sql) {
-                    const sqlDiv = document.createElement('div');
-                    sqlDiv.className = 'meta-sql';
-                    sqlDiv.textContent = meta.sql;
-                    metaDiv.appendChild(sqlDiv);
-                }
-
-                if (meta.sources && meta.sources.length > 0) {
-                    const srcDiv = document.createElement('div');
-                    srcDiv.className = 'meta-sources';
-                    srcDiv.textContent = '출처: ' + meta.sources.map(s =>
-                        `${s.doc_id} (${(s.similarity * 100).toFixed(0)}%)`
-                    ).join(', ');
-                    metaDiv.appendChild(srcDiv);
-                }
-
-                if (metaDiv.children.length > 0) msg.appendChild(metaDiv);
-            }
-
-            chatArea.appendChild(msg);
-            chatArea.scrollTop = chatArea.scrollHeight;
-            return textDiv;
-        }
-
-        function finalizeStreamMessage(fullAnswer, meta) {
-            const msg = document.getElementById('streamingMessage');
-            if (!msg) return;
-            msg.removeAttribute('id');
-
-            const bubble = msg.querySelector('.bubble');
-            if (!bubble) return;
-
-            const hasTable = meta && meta.data && Array.isArray(meta.data) && meta.data.length > 0;
-
-            const copyBar = document.createElement('div');
-            copyBar.className = 'copy-bar';
-
-            const copyTextBtn = document.createElement('button');
-            copyTextBtn.className = 'copy-btn';
-            copyTextBtn.textContent = '글 복사';
-            copyTextBtn.onclick = () => doCopy(fullAnswer, copyTextBtn);
-            copyBar.appendChild(copyTextBtn);
-
-            if (hasTable) {
-                const copyTableBtn = document.createElement('button');
-                copyTableBtn.className = 'copy-btn';
-                copyTableBtn.textContent = '표 복사';
-                copyTableBtn.onclick = () => doCopy(tableDataToTSV(meta.data), copyTableBtn);
-                copyBar.appendChild(copyTableBtn);
-            }
-
-            bubble.appendChild(copyBar);
-
-            const textDiv = document.getElementById('streamingAnswerText');
-            if (textDiv) textDiv.removeAttribute('id');
-        }
-
-        function parseSSE(buffer) {
-            const events = [];
-            const blocks = buffer.split('\n\n');
-            const remainder = blocks.pop();
-            for (const block of blocks) {
-                if (!block.trim()) continue;
-                let event = '', data = '';
-                for (const line of block.split('\n')) {
-                    if (line.startsWith('event: ')) event = line.slice(7).trim();
-                    else if (line.startsWith('data: ')) data = line.slice(6);
-                }
-                if (event && data) {
-                    try { events.push({ event, data: JSON.parse(data) }); }
-                    catch {}
-                }
-            }
-            return { events, remainder };
-        }
-
         async function sendQuestion(e) {
             e.preventDefault();
             const q = questionInput.value.trim();
@@ -1000,80 +744,28 @@
                         history: conversationHistory.slice(0, -1),
                     }),
                 });
+                const data = await res.json();
+                hideLoading();
 
-                const contentType = res.headers.get('content-type') || '';
+                if (data.success) {
+                    const meta = currentMode === 'rag'
+                        ? { sources: data.sources }
+                        : { sql: data.sql, data: data.data };
+                    addMessage(data.answer, false, meta);
 
-                if (contentType.includes('text/event-stream')) {
-                    const reader = res.body.getReader();
-                    const decoder = new TextDecoder();
-                    let buffer = '';
-                    let streamMeta = null;
-                    let streamAnswer = '';
-                    let answerEl = null;
-
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-                        buffer += decoder.decode(value, { stream: true });
-
-                        const parsed = parseSSE(buffer);
-                        buffer = parsed.remainder;
-
-                        for (const { event, data } of parsed.events) {
-                            if (event === 'meta') {
-                                hideLoading();
-                                streamMeta = data;
-                                answerEl = addStreamingMessage(streamMeta);
-                            } else if (event === 'delta' && answerEl) {
-                                streamAnswer += data.text;
-                                answerEl.innerHTML = formatText(streamAnswer);
-                                chatArea.scrollTop = chatArea.scrollHeight;
-                            } else if (event === 'done') {
-                                streamAnswer = data.answer;
-                                if (answerEl) answerEl.innerHTML = formatText(streamAnswer);
-                                finalizeStreamMessage(streamAnswer, streamMeta);
-
-                                const historyEntry = { role: 'assistant', content: streamAnswer };
-                                if (currentMode === 'sql' && streamMeta) {
-                                    historyEntry.sql = streamMeta.sql || null;
-                                    historyEntry.rowCount = Array.isArray(streamMeta.data) ? streamMeta.data.length : 0;
-                                }
-                                conversationHistory.push(historyEntry);
-                            } else if (event === 'error') {
-                                hideLoading();
-                                addMessage('오류: ' + (data.error || '알 수 없는 오류'), false);
-                                conversationHistory.push({ role: 'assistant', content: '오류: ' + (data.error || '') });
-                            }
-                        }
+                    const historyEntry = { role: 'assistant', content: data.answer };
+                    if (currentMode === 'sql') {
+                        historyEntry.sql = data.sql || null;
+                        historyEntry.rowCount = Array.isArray(data.data) ? data.data.length : 0;
                     }
+                    conversationHistory.push(historyEntry);
 
                     if (conversationHistory.length > 10) {
                         conversationHistory = conversationHistory.slice(-10);
                     }
                 } else {
-                    const data = await res.json();
-                    hideLoading();
-
-                    if (data.success) {
-                        const meta = currentMode === 'rag'
-                            ? { sources: data.sources }
-                            : { sql: data.sql, data: data.data };
-                        addMessage(data.answer, false, meta);
-
-                        const historyEntry = { role: 'assistant', content: data.answer };
-                        if (currentMode === 'sql') {
-                            historyEntry.sql = data.sql || null;
-                            historyEntry.rowCount = Array.isArray(data.data) ? data.data.length : 0;
-                        }
-                        conversationHistory.push(historyEntry);
-
-                        if (conversationHistory.length > 10) {
-                            conversationHistory = conversationHistory.slice(-10);
-                        }
-                    } else {
-                        addMessage('오류: ' + (data.error || '알 수 없는 오류'), false);
-                        conversationHistory.push({ role: 'assistant', content: '오류: ' + (data.error || '') });
-                    }
+                    addMessage('오류: ' + (data.error || '알 수 없는 오류'), false);
+                    conversationHistory.push({ role: 'assistant', content: '오류: ' + (data.error || '') });
                 }
             } catch (err) {
                 hideLoading();
@@ -1241,189 +933,6 @@
         // 모달 외부 클릭으로 닫기
         document.getElementById('uploadModal').addEventListener('click', (e) => {
             if (e.target === e.currentTarget) closeUploadModal();
-        });
-
-        // ===== 거래처 관리 모달 =====
-        let customersSearchTimer = null;
-        let customersLoaded = false;
-
-        function openCustomersModal() {
-            document.getElementById('customersModal').classList.add('show');
-            if (!customersLoaded) {
-                loadCustomers('');
-                customersLoaded = true;
-            }
-            setTimeout(() => document.getElementById('customersSearch').focus(), 50);
-        }
-
-        function closeCustomersModal() {
-            document.getElementById('customersModal').classList.remove('show');
-        }
-
-        async function loadCustomers(q) {
-            const listEl = document.getElementById('customersList');
-            listEl.innerHTML = '<div class="customers-list-empty">불러오는 중...</div>';
-
-            try {
-                const url = '/api/customers' + (q ? `?q=${encodeURIComponent(q)}` : '');
-                const res = await authFetch(url);
-                const data = await res.json();
-
-                if (!data.success) {
-                    listEl.innerHTML = `<div class="customers-list-empty">오류: ${escapeHtml(data.error || '알 수 없음')}</div>`;
-                    return;
-                }
-
-                renderCustomers(data.customers);
-            } catch (err) {
-                listEl.innerHTML = `<div class="customers-list-empty">연결 오류: ${escapeHtml(err.message)}</div>`;
-            }
-        }
-
-        function renderCustomers(customers) {
-            const listEl = document.getElementById('customersList');
-            if (!customers || customers.length === 0) {
-                listEl.innerHTML = '<div class="customers-list-empty">검색 결과가 없습니다.</div>';
-                return;
-            }
-
-            listEl.innerHTML = '';
-            for (const c of customers) {
-                listEl.appendChild(buildCustomerRow(c));
-            }
-        }
-
-        function buildCustomerRow(c) {
-            const row = document.createElement('div');
-            row.className = 'customer-row';
-            row.dataset.code = c.customer_code;
-
-            const info = document.createElement('div');
-            info.className = 'customer-info';
-            const nameDiv = document.createElement('div');
-            nameDiv.className = 'customer-name';
-            nameDiv.textContent = c.company_name;
-            nameDiv.title = c.company_name;
-            const metaDiv = document.createElement('div');
-            metaDiv.className = 'customer-meta';
-            const normLabel = c.normalized_name ? `정규화: ${c.normalized_name}` : '정규화 미설정';
-            metaDiv.textContent = `${normLabel} · ${c.customer_code}`;
-            metaDiv.title = metaDiv.textContent;
-            info.appendChild(nameDiv);
-            info.appendChild(metaDiv);
-
-            const aliasWrap = document.createElement('div');
-            aliasWrap.className = 'customer-aliases';
-
-            // 행 단위 상태
-            let aliases = Array.isArray(c.aliases) ? [...c.aliases] : [];
-
-            const addInput = document.createElement('input');
-            addInput.type = 'text';
-            addInput.className = 'alias-add-input';
-            addInput.placeholder = '+ 별칭 추가 (Enter)';
-
-            const errorEl = document.createElement('div');
-            errorEl.className = 'alias-error-text';
-            errorEl.style.display = 'none';
-
-            function showError(msg) {
-                errorEl.textContent = msg;
-                errorEl.style.display = '';
-                setTimeout(() => { errorEl.style.display = 'none'; }, 2500);
-            }
-
-            function renderChips() {
-                // 기존 칩 제거 (input은 보존)
-                Array.from(aliasWrap.querySelectorAll('.alias-chip')).forEach((el) => el.remove());
-
-                aliases.forEach((alias) => {
-                    const chip = document.createElement('span');
-                    chip.className = 'alias-chip';
-                    const txt = document.createElement('span');
-                    txt.textContent = alias;
-                    chip.appendChild(txt);
-                    const x = document.createElement('button');
-                    x.className = 'alias-chip-remove';
-                    x.textContent = '×';
-                    x.title = '제거';
-                    x.onclick = () => removeAlias(alias, chip);
-                    chip.appendChild(x);
-                    aliasWrap.insertBefore(chip, addInput);
-                });
-            }
-
-            async function syncAliases(snapshot) {
-                addInput.disabled = true;
-                try {
-                    const res = await authFetch('/api/customers', {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ customer_code: c.customer_code, aliases }),
-                    });
-                    const data = await res.json();
-                    if (data.success && data.customer) {
-                        aliases = Array.isArray(data.customer.aliases) ? data.customer.aliases : [];
-                        renderChips();
-                    } else {
-                        aliases = snapshot;
-                        renderChips();
-                        showError('저장 실패: ' + (data.error || '알 수 없음'));
-                    }
-                } catch (err) {
-                    aliases = snapshot;
-                    renderChips();
-                    showError('연결 오류: ' + err.message);
-                } finally {
-                    addInput.disabled = false;
-                }
-            }
-
-            async function addAlias(raw) {
-                const trimmed = raw.trim();
-                if (!trimmed) return;
-                const snapshot = [...aliases];
-                aliases.push(trimmed);
-                addInput.value = '';
-                renderChips();
-                await syncAliases(snapshot);
-                addInput.focus();
-            }
-
-            async function removeAlias(alias, chipEl) {
-                const idx = aliases.indexOf(alias);
-                if (idx === -1) return;
-                const snapshot = [...aliases];
-                if (chipEl) chipEl.classList.add('removing');
-                aliases.splice(idx, 1);
-                renderChips();
-                await syncAliases(snapshot);
-            }
-
-            addInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addAlias(addInput.value);
-                }
-            });
-
-            aliasWrap.appendChild(addInput);
-            aliasWrap.appendChild(errorEl);
-            renderChips();
-
-            row.appendChild(info);
-            row.appendChild(aliasWrap);
-            return row;
-        }
-
-        document.getElementById('customersSearch').addEventListener('input', (e) => {
-            const q = e.target.value.trim();
-            clearTimeout(customersSearchTimer);
-            customersSearchTimer = setTimeout(() => loadCustomers(q), 300);
-        });
-
-        document.getElementById('customersModal').addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) closeCustomersModal();
         });
 
         // ===== 히스토리 기능 =====

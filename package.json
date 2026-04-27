@@ -11,9 +11,7 @@
     "query-sql": "node scripts/query_sql.mjs",
     "chat-sql": "node scripts/chat_sql.mjs",
     "sync-sales": "node scripts/sync_sales.mjs",
-    "sync-diary": "node scripts/sync_diary.mjs",
-    "backfill-norm": "node scripts/backfill_normalized_names.mjs",
-    "rematch-codes": "node scripts/rematch_customer_codes.mjs"
+    "sync-diary": "node scripts/sync_diary.mjs"
   },
   "keywords": [],
   "author": "",
