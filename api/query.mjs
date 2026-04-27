@@ -1,10 +1,14 @@
 import { validateEnv } from "../lib/clients.mjs";
 import { embedQuery } from "../lib/embedding.mjs";
-import { searchRelevantDocs, buildContext, generateRAGAnswer } from "../lib/rag.mjs";
+import { searchRelevantDocs, buildContext, streamRAGAnswer } from "../lib/rag.mjs";
 import { logQuery } from "../lib/logger.mjs";
 import { verifyAuth, setCorsHeaders, sendUnauthorized } from "../lib/auth.mjs";
 
-/** RAG 문서 질의응답 API */
+function sendSSE(res, event, data) {
+  res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+}
+
+/** RAG 문서 질의응답 API (SSE 스트리밍) */
 export default async function handler(req, res) {
   setCorsHeaders(res);
 
@@ -21,7 +25,6 @@ export default async function handler(req, res) {
     }
 
     const q = question.trim();
-    // history 안전성: 배열이고 최대 10턴만 허용
     const safeHistory = Array.isArray(history) ? history.slice(-10) : [];
 
     const embedding = await embedQuery(q);
@@ -39,20 +42,34 @@ export default async function handler(req, res) {
     }
 
     const context = buildContext(docs);
-    const answer = await generateRAGAnswer(q, context, safeHistory);
     const sources = docs.map((d) => ({ doc_id: d.doc_id, similarity: d.similarity }));
 
-    logQuery({ mode: "rag", question: q, answer, sources, success: true });
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
 
-    return res.status(200).json({
-      success: true,
-      question: q,
-      answer,
-      sources,
-    });
+    // 출처 정보 즉시 전송
+    sendSSE(res, "meta", { success: true, question: q, sources });
+
+    // 답변 스트리밍
+    let fullAnswer = "";
+    for await (const chunk of streamRAGAnswer(q, context, safeHistory)) {
+      fullAnswer += chunk;
+      sendSSE(res, "delta", { text: chunk });
+    }
+
+    sendSSE(res, "done", { answer: fullAnswer });
+    res.end();
+
+    logQuery({ mode: "rag", question: q, answer: fullAnswer, sources, success: true });
   } catch (error) {
     console.error("API 오류:", error);
+    if (res.headersSent) {
+      sendSSE(res, "error", { error: error.message });
+      res.end();
+    } else {
+      res.status(500).json({ success: false, error: "서버 오류가 발생했습니다.", message: error.message });
+    }
     logQuery({ mode: "rag", question: req.body?.question, success: false, error_message: error.message });
-    return res.status(500).json({ success: false, error: "서버 오류가 발생했습니다.", message: error.message });
   }
 }
